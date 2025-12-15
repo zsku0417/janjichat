@@ -1,0 +1,588 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\DocumentChunk;
+use App\Models\Conversation;
+use App\Models\RestaurantSetting;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class RAGService
+{
+    protected OpenAIService $openAI;
+    protected float $confidenceThreshold;
+
+    public function __construct(OpenAIService $openAI)
+    {
+        $this->openAI = $openAI;
+        $this->confidenceThreshold = config('openai.confidence_threshold', 0.7);
+    }
+
+    /**
+     * Search the knowledge base for relevant content.
+     *
+     * @param string $query
+     * @param int $limit
+     * @return Collection
+     */
+    public function search(string $query, int $limit = 5): Collection
+    {
+        // Generate embedding for the query
+        $queryEmbedding = $this->openAI->createEmbedding($query);
+        $embeddingString = '[' . implode(',', $queryEmbedding) . ']';
+
+        // Perform vector similarity search using pgvector
+        $results = DB::select("
+            SELECT 
+                dc.id,
+                dc.document_id,
+                dc.content,
+                dc.chunk_index,
+                d.original_name as document_name,
+                1 - (dc.embedding <=> ?::vector) as similarity
+            FROM document_chunks dc
+            JOIN documents d ON d.id = dc.document_id
+            WHERE d.status = 'completed'
+            ORDER BY dc.embedding <=> ?::vector
+            LIMIT ?
+        ", [$embeddingString, $embeddingString, $limit]);
+
+        return collect($results);
+    }
+
+    /**
+     * Generate a response using RAG (Retrieval Augmented Generation).
+     * The AI can answer from both the knowledge base AND conversation history.
+     *
+     * @param string $query
+     * @param Conversation $conversation
+     * @param string $businessType The business type ('restaurant' or 'order_tracking')
+     * @return array ['response' => string|null, 'confident' => bool, 'reason' => string|null]
+     */
+    public function generateResponse(string $query, Conversation $conversation, string $businessType = 'restaurant'): array
+    {
+        // Step 1: Search knowledge base for relevant documents
+        $searchResults = $this->search($query);
+        $topScore = $searchResults->first()?->similarity ?? 0;
+
+        // Step 2: Build context from knowledge base (even if low score, include what we found)
+        $knowledgeContext = "";
+        if ($topScore >= $this->confidenceThreshold) {
+            $knowledgeContext = $this->buildContext($searchResults);
+        } else {
+            $knowledgeContext = "No highly relevant documents found in knowledge base.";
+            Log::info('RAG: Low knowledge base match, will rely on conversation context', [
+                'query' => $query,
+                'top_score' => $topScore,
+            ]);
+        }
+
+        // Step 3: Get conversation history - this is ALWAYS included
+        $conversationHistory = $this->getConversationHistory($conversation);
+
+        // Step 4: Generate response with AI - it can answer from EITHER source
+        return $this->generateWithConfidence($query, $knowledgeContext, $conversationHistory, $conversation, $businessType);
+    }
+
+    /**
+     * Build context string from search results.
+     */
+    protected function buildContext(Collection $results): string
+    {
+        $context = "Relevant information from knowledge base:\n\n";
+
+        foreach ($results as $index => $result) {
+            if ($result->similarity >= $this->confidenceThreshold) {
+                $context .= "--- Source: {$result->document_name} ---\n";
+                $context .= $result->content . "\n\n";
+            }
+        }
+
+        return $context;
+    }
+
+    /**
+     * Get formatted conversation history.
+     */
+    protected function getConversationHistory(Conversation $conversation): array
+    {
+        $messages = $conversation->messages()
+            ->where('message_type', 'text')
+            ->orderBy('created_at', 'asc')
+            ->take(20) // Last 20 messages for context
+            ->get();
+
+        $history = [];
+        foreach ($messages as $message) {
+            $role = $message->isInbound() ? 'user' : 'assistant';
+            $history[] = [
+                'role' => $role,
+                'content' => $message->content,
+            ];
+        }
+
+        return $history;
+    }
+
+    /**
+     * Generate response with confidence self-evaluation.
+     */
+    protected function generateWithConfidence(
+        string $query,
+        string $context,
+        array $conversationHistory,
+        Conversation $conversation,
+        string $businessType = 'restaurant'
+    ): array {
+        $systemPrompt = $this->buildSystemPrompt($context, $businessType);
+
+        // Add the current query to history
+        $conversationHistory[] = [
+            'role' => 'user',
+            'content' => $query,
+        ];
+
+        // Ask AI to respond with confidence evaluation
+        $evaluationPrompt = $systemPrompt . "\n\n" .
+            "IMPORTANT RULES:\n" .
+            "1. LANGUAGE: Detect the language of the customer's message and REPLY IN THE SAME LANGUAGE. " .
+            "If they write in Chinese, reply in Chinese. If in Malay, reply in Malay. Match their language exactly.\n\n" .
+            "2. CONFIDENCE: You must evaluate your confidence in your answer.\n" .
+            "You can be confident if you can answer from EITHER:\n" .
+            "- The conversation history (what the customer told you earlier in this chat)\n" .
+            "- The knowledge base context\n\n" .
+            "If the customer asks about something THEY mentioned earlier (their name, where they're from, their preferences, etc.), " .
+            "you should be confident and answer based on the conversation history.\n\n" .
+            "Only indicate low confidence if the information is not in either source.\n\n" .
+            "Respond in JSON format:\n" .
+            "{\n" .
+            "  \"response\": \"Your response to the customer IN THEIR LANGUAGE (or null if not confident)\",\n" .
+            "  \"confident\": true/false,\n" .
+            "  \"reason\": \"If not confident, explain why in 1-2 sentences\"\n" .
+            "}";
+
+        try {
+            $result = $this->openAI->chatJson($conversationHistory, $evaluationPrompt);
+
+            $confident = $result['confident'] ?? false;
+            $response = $result['response'] ?? null;
+            $reason = $result['reason'] ?? null;
+
+            if (!$confident || empty($response)) {
+                Log::info('RAG: AI not confident in response', [
+                    'query' => $query,
+                    'reason' => $reason,
+                ]);
+
+                return [
+                    'response' => null,
+                    'confident' => false,
+                    'reason' => $reason ?? 'The AI was not confident enough to provide a response.',
+                ];
+            }
+
+            return [
+                'response' => $response,
+                'confident' => true,
+                'reason' => null,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('RAG: Failed to generate response', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'response' => null,
+                'confident' => false,
+                'reason' => 'An error occurred while generating the response.',
+            ];
+        }
+    }
+
+    /**
+     * Build the system prompt for the AI based on business type.
+     */
+    protected function buildSystemPrompt(string $context, string $businessType = 'restaurant'): string
+    {
+        $settings = RestaurantSetting::getInstance();
+        $tone = $settings->ai_tone ?? 'You are a friendly and professional assistant.';
+        $businessName = $settings->name ?? 'Our Business';
+        $operatingHours = "{$settings->formatted_opening_time} - {$settings->formatted_closing_time}";
+
+        // Get business-specific configuration
+        $config = $this->getBusinessConfig($businessType);
+
+        return <<<PROMPT
+{$tone}
+
+You are an AI assistant for {$businessName}. Your role is to help customers with:
+1. {$config['role1']}
+2. {$config['role2']}
+3. {$config['role3']}
+
+Operating Hours: {$operatingHours}
+
+KNOWLEDGE BASE CONTEXT:
+{$context}
+
+RULES:
+- You can answer questions from TWO sources:
+  1. The CONVERSATION HISTORY (previous messages in this chat) - use this to remember what the customer told you earlier
+  2. The KNOWLEDGE BASE CONTEXT above - use this for {$config['contextType']} information
+- If the customer asks something they mentioned earlier in the conversation (like their name, preferences), refer to the conversation history to answer
+- If the question is about {$config['questionType']}, refer to the knowledge base
+- If you cannot find the answer in either source, indicate low confidence
+- Be helpful, concise, and friendly
+- Detect and respond in the same language the customer uses
+- Never make up information that's not in either source
+- {$config['collectionNote']}
+PROMPT;
+    }
+
+    /**
+     * Get business-specific configuration for prompts.
+     */
+    protected function getBusinessConfig(string $businessType): array
+    {
+        if ($businessType === 'order_tracking') {
+            return [
+                'role1' => 'Answering questions about products and services based on the provided knowledge base',
+                'role2' => 'Helping with placing orders',
+                'role3' => 'Providing information about operating hours, products, and services',
+                'contextType' => 'business-specific',
+                'questionType' => 'products, services, or policies',
+                'collectionNote' => 'For order requests, you\'ll need to collect: products, quantities, delivery/pickup preference, and contact details',
+            ];
+        }
+
+        // Default: Restaurant
+        return [
+            'role1' => 'Answering questions about the restaurant based on the provided knowledge base',
+            'role2' => 'Helping with table bookings',
+            'role3' => 'Providing information about operating hours, menu, and services',
+            'contextType' => 'restaurant-specific',
+            'questionType' => 'restaurant information (menu, hours, policies)',
+            'collectionNote' => 'For booking requests, you\'ll need to collect: name, date, time, and number of guests',
+        ];
+    }
+
+    /**
+     * Detect the intent of a customer message with full conversation context.
+     * Like ChatGPT, the AI understands the full conversation history to determine intent.
+     *
+     * @param string $message The current message
+     * @param Conversation $conversation The conversation for context
+     * @param string $businessType The business type ('restaurant' or 'order_tracking')
+     * @return array ['intent' => string, 'entities' => array]
+     */
+    public function detectIntent(string $message, Conversation $conversation, string $businessType = 'restaurant'): array
+    {
+        // Get conversation history for context (like ChatGPT)
+        $conversationHistory = $this->getConversationHistory($conversation);
+
+        // Build a summary of conversation context for the AI
+        $historyContext = "";
+        if (!empty($conversationHistory)) {
+            $historyContext = "CONVERSATION HISTORY (for context):\n";
+            foreach ($conversationHistory as $msg) {
+                $role = $msg['role'] === 'user' ? 'Customer' : 'Assistant';
+                // Limit each message to avoid token overflow
+                $content = mb_substr($msg['content'], 0, 300);
+                if (strlen($msg['content']) > 300) {
+                    $content .= '...';
+                }
+                $historyContext .= "- {$role}: {$content}\n";
+            }
+            $historyContext .= "\n---\n\n";
+        }
+
+        // Build business-type specific prompt
+        $systemPrompt = $this->buildIntentPrompt($historyContext, $message, $businessType);
+
+        try {
+            $result = $this->openAI->chatJson([
+                ['role' => 'user', 'content' => $message]
+            ], $systemPrompt);
+
+            Log::info('Smart intent detection result', [
+                'conversation_id' => $conversation->id,
+                'message' => mb_substr($message, 0, 100),
+                'intent' => $result['intent'] ?? 'other',
+                'reasoning' => $result['reasoning'] ?? 'none',
+            ]);
+
+            return [
+                'intent' => $result['intent'] ?? 'other',
+                'entities' => $result['entities'] ?? [],
+            ];
+        } catch (\Exception $e) {
+            Log::error('Intent detection failed', ['error' => $e->getMessage()]);
+            return [
+                'intent' => 'other',
+                'entities' => [],
+            ];
+        }
+    }
+
+    /**
+     * Build the intent detection prompt based on business type.
+     */
+    protected function buildIntentPrompt(string $historyContext, string $message, string $businessType): string
+    {
+        // Get business-specific intent configuration
+        $config = $this->getIntentConfig($businessType);
+
+        return <<<PROMPT
+You are an intelligent AI assistant analyzing customer messages for a {$config['businessLabel']} chatbot.
+Your job is to understand the FULL CONTEXT of the conversation and determine the customer's true intent.
+
+{$historyContext}
+
+CURRENT MESSAGE TO ANALYZE:
+"{$message}"
+
+Based on the conversation history and current message, determine the customer's intent.
+
+IMPORTANT CONTEXT RULES:
+{$config['contextRules']}
+- Be smart about understanding follow-up messages in the context of the conversation
+
+Respond in JSON format:
+{
+    "intent": "one of: {$config['intentList']}",
+    "entities": {$config['entities']},
+    "reasoning": "brief explanation of why you chose this intent"
+}
+
+Intent definitions:
+- greeting: Customer is saying hello or starting a conversation
+- general_question: Customer is asking a general question about {$config['questionSubject']}
+{$config['intentDefinitions']}
+- other: Anything else
+
+Only include entities that are explicitly mentioned. Use null for unmentioned entities.
+PROMPT;
+    }
+
+    /**
+     * Get business-specific intent detection configuration.
+     */
+    protected function getIntentConfig(string $businessType): array
+    {
+        if ($businessType === 'order_tracking') {
+            return [
+                'businessLabel' => 'business',
+                'contextRules' => '- If the conversation shows an order was just placed and the customer is now asking to add/change something, this is an "order_modify" NOT a new "order_request"
+- If the customer says "I want to order" or similar with no prior order in the conversation, this is an "order_request"
+- If the customer has an existing order (shown in conversation) and wants to cancel it, this is "order_cancel"',
+                'intentList' => 'greeting, general_question, order_request, order_inquiry, order_modify, order_cancel, other',
+                'entities' => '{
+        "name": "extracted name if mentioned",
+        "products": "list of products mentioned",
+        "quantity": "quantities if mentioned",
+        "delivery_type": "delivery or pickup if mentioned",
+        "date": "extracted date if mentioned (YYYY-MM-DD format)",
+        "time": "extracted time if mentioned (HH:MM format)",
+        "special_request": "any special requests mentioned"
+    }',
+                'questionSubject' => 'products or services',
+                'intentDefinitions' => '- order_request: Customer wants to place a NEW order (no prior order in this conversation)
+- order_modify: Customer wants to CHANGE or ADD something to their existing/recent order
+- order_inquiry: Customer asking about their existing order status or details
+- order_cancel: Customer wants to cancel an order',
+            ];
+        }
+
+        // Default: Restaurant
+        return [
+            'businessLabel' => 'restaurant',
+            'contextRules' => '- If the conversation shows a booking was just confirmed and the customer is now asking to add/change something (like decorations, special requests, seating preferences), this is a "booking_modify" NOT a new "booking_request"
+- If the customer says "I want to book" or similar with no prior booking in the conversation, this is a "booking_request"
+- If the customer has an existing booking (shown in conversation) and wants to cancel it, this is "booking_cancel"',
+            'intentList' => 'greeting, general_question, booking_request, booking_inquiry, booking_modify, booking_cancel, other',
+            'entities' => '{
+        "name": "extracted name if mentioned",
+        "date": "extracted date if mentioned (YYYY-MM-DD format)",
+        "time": "extracted time if mentioned (HH:MM format)",
+        "pax": "number of guests if mentioned",
+        "special_request": "any special requests mentioned (decorations, seating preferences, celebrations, dietary requirements, etc.)"
+    }',
+            'questionSubject' => 'the restaurant',
+            'intentDefinitions' => '- booking_request: Customer wants to make a NEW reservation (no prior booking in this conversation)
+- booking_modify: Customer wants to CHANGE or ADD something to their existing/recent booking
+- booking_inquiry: Customer asking about their existing booking status or details
+- booking_cancel: Customer wants to cancel a booking',
+        ];
+    }
+
+    /**
+     * Generate a contextual AI response based on intent and business data.
+     * This allows the AI to craft natural, conversational responses instead of using templates.
+     *
+     * @param string $intent The detected intent (e.g., 'booking_modify', 'booking_inquiry')
+     * @param string $customerMessage The customer's message
+     * @param array $businessData Context data like bookings, orders, settings
+     * @param Conversation $conversation The conversation for history
+     * @param string $businessType The business type for tone
+     * @return string The AI-generated response
+     */
+    public function generateContextualResponse(
+        string $intent,
+        string $customerMessage,
+        array $businessData,
+        Conversation $conversation,
+        string $businessType = 'restaurant'
+    ): string {
+        $settings = RestaurantSetting::getInstance();
+        $aiTone = $settings->ai_tone ?? 'friendly and professional';
+
+        // Get conversation history for context
+        $historyContext = '';
+        $recentMessages = $conversation->messages()
+            ->orderBy('created_at', 'desc')
+            ->take(6)
+            ->get()
+            ->reverse();
+
+        foreach ($recentMessages as $msg) {
+            $role = $msg->direction === 'inbound' ? 'Customer' : 'Assistant';
+            $historyContext .= "{$role}: {$msg->content}\n";
+        }
+
+        // Format business data for AI
+        $dataContext = $this->formatBusinessDataForAI($businessData);
+
+        // Build a detailed prompt for natural response generation
+        $prompt = $this->buildContextualResponsePrompt(
+            $intent,
+            $customerMessage,
+            $dataContext,
+            $historyContext,
+            $aiTone,
+            $businessType
+        );
+
+        try {
+            $response = $this->openAI->chat([
+                ['role' => 'user', 'content' => $prompt]
+            ]);
+
+            return trim($response);
+        } catch (\Exception $e) {
+            Log::error('Failed to generate contextual response', [
+                'intent' => $intent,
+                'error' => $e->getMessage(),
+            ]);
+
+            // Fallback to a generic response
+            return "I'd be happy to help you with that. Could you please provide more details?";
+        }
+    }
+
+    /**
+     * Format business data array into readable context for AI.
+     */
+    protected function formatBusinessDataForAI(array $data): string
+    {
+        $context = "";
+
+        if (isset($data['bookings']) && is_array($data['bookings'])) {
+            $context .= "CUSTOMER'S BOOKINGS:\n";
+            foreach ($data['bookings'] as $booking) {
+                $context .= "- Booking ID: {$booking['id']}\n";
+                $context .= "  Date: {$booking['date']}\n";
+                $context .= "  Time: {$booking['time']}\n";
+                $context .= "  Guests: {$booking['pax']}\n";
+                $context .= "  Table: {$booking['table']}\n";
+                if (!empty($booking['special_request'])) {
+                    $context .= "  Special Request: {$booking['special_request']}\n";
+                }
+                $context .= "\n";
+            }
+        }
+
+        if (isset($data['orders']) && is_array($data['orders'])) {
+            $context .= "CUSTOMER'S ORDERS:\n";
+            foreach ($data['orders'] as $order) {
+                $context .= "- Order #{$order['id']}: {$order['status']}\n";
+                if (!empty($order['items'])) {
+                    $context .= "  Items: {$order['items']}\n";
+                }
+                $context .= "\n";
+            }
+        }
+
+        if (isset($data['settings'])) {
+            $context .= "BUSINESS SETTINGS:\n";
+            foreach ($data['settings'] as $key => $value) {
+                $context .= "- {$key}: {$value}\n";
+            }
+        }
+
+        if (isset($data['action_needed'])) {
+            $context .= "\nACTION NEEDED: {$data['action_needed']}\n";
+        }
+
+        if (isset($data['action_result'])) {
+            $context .= "\nACTION RESULT: {$data['action_result']}\n";
+        }
+
+        return $context ?: "No additional business data available.";
+    }
+
+    /**
+     * Build the prompt for contextual response generation.
+     */
+    protected function buildContextualResponsePrompt(
+        string $intent,
+        string $customerMessage,
+        string $dataContext,
+        string $historyContext,
+        string $aiTone,
+        string $businessType
+    ): string {
+        $businessLabel = $businessType === 'order_tracking' ? 'business' : 'restaurant';
+
+        $intentGuidance = match ($intent) {
+            'booking_modify' => "The customer wants to modify their booking. If they provided new details (date/time/pax), confirm the changes. If they just said 'reschedule' without new details, show their current booking and ask what they'd like to change.",
+            'booking_inquiry' => "The customer is asking about their booking. Show them their booking details in a friendly way.",
+            'booking_cancel' => "The customer wants to cancel. Show their booking and ask for confirmation before canceling.",
+            'booking_request', 'greeting' => "The customer wants to make a new booking. Guide them through the booking process.",
+            'order_inquiry' => "The customer is asking about their order. Show them order status and details.",
+            'general_question' => "Answer the customer's question using available information.",
+            default => "Help the customer with their request.",
+        };
+
+        return <<<PROMPT
+You are a helpful {$businessLabel} assistant. Your personality: {$aiTone}
+
+CONVERSATION HISTORY:
+{$historyContext}
+
+CUSTOMER'S LATEST MESSAGE:
+"{$customerMessage}"
+
+DETECTED INTENT: {$intent}
+{$intentGuidance}
+
+BUSINESS DATA:
+{$dataContext}
+
+INSTRUCTIONS:
+1. **LANGUAGE**: Detect the language of the customer's message and REPLY IN THE SAME LANGUAGE. If customer writes in Chinese, reply in Chinese. If in Malay, reply in Malay. Match their language exactly.
+2. Generate a natural, conversational response
+3. Be warm and helpful, use appropriate emojis sparingly
+4. If showing booking/order details, format them nicely with emojis (📅 for date, ⏰ for time, 👥 for guests)
+5. If you need more information from customer, ask clearly
+6. Keep response concise but complete
+7. NEVER expose technical errors or system details to customer
+8. If action_result shows an error, apologize and offer alternatives
+
+Respond directly as the assistant (no JSON, no prefix, just the message):
+PROMPT;
+    }
+}
+

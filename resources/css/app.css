@@ -1,0 +1,464 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* CSS Custom Properties for Theme */
+:root {
+    /* Primary Colors */
+    --color-primary: #8b5cf6;
+    --color-primary-light: #a78bfa;
+    --color-primary-dark: #7c3aed;
+
+    /* Secondary Colors */
+    --color-secondary: #06b6d4;
+    --color-secondary-light: #22d3ee;
+    --color-secondary-dark: #0891b2;
+
+    /* Accent Colors */
+    --color-accent: #f43f5e;
+    --color-accent-light: #fb7185;
+    --color-accent-dark: #e11d48;
+
+    /* Gradient Definitions */
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-secondary: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+    --gradient-accent: linear-gradient(135deg, #f43f5e 0%, #8b5cf6 100%);
+    --gradient-success: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+    --gradient-dark: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    --gradient-bg: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
+
+    /* Glass Effect */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+}
+
+.dark {
+    /* Dark Mode Overrides */
+    --gradient-bg: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #020617 100%);
+    
+    /* Glass Effect Dark */
+    --glass-bg: rgba(15, 23, 42, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Base Styles */
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: var(--gradient-bg);
+        min-height: 100vh;
+    }
+}
+
+/* Component Styles */
+@layer components {
+
+    /* Glass Card Effect */
+    .glass {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-border);
+        box-shadow: var(--glass-shadow);
+    }
+
+    /* Dark mode for glass effect - uses CSS custom properties that change in .dark context */
+    .dark .glass {
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Keep glass-dark for backwards compatibility but it should not be used with dark: prefix */
+    .glass-dark {
+        background: rgba(15, 23, 42, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Gradient Text */
+    .text-gradient {
+        background: var(--gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .text-gradient-secondary {
+        background: var(--gradient-secondary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    /* Gradient Buttons */
+    .btn-gradient {
+        background: var(--gradient-primary);
+        color: white;
+        padding: 0.625rem 1.5rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+    }
+
+    .btn-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+    }
+
+    .btn-gradient-secondary {
+        background: var(--gradient-secondary);
+        color: white;
+        padding: 0.625rem 1.5rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+    }
+
+    .btn-gradient-secondary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4);
+    }
+
+    .btn-gradient-success {
+        background: var(--gradient-success);
+        color: white;
+        padding: 0.625rem 1.5rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-gradient-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+    }
+
+    /* Card with Gradient Border */
+    .card-gradient-border {
+        position: relative;
+        background: white;
+        border-radius: 1rem;
+    }
+
+    .card-gradient-border::before {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: 1rem;
+        background: var(--gradient-primary);
+        z-index: -1;
+        opacity: 0.5;
+    }
+
+    /* Stat Card */
+    .stat-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-border);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(31, 38, 135, 0.2);
+    }
+
+    /* Navigation Link */
+    .nav-link {
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-weight: 500;
+        color: #475569;
+        transition: all 0.2s ease;
+    }
+
+    .nav-link:hover {
+        background: rgba(139, 92, 246, 0.1);
+        color: var(--color-primary);
+    }
+
+    .nav-link.active {
+        background: var(--gradient-primary);
+        color: white;
+    }
+
+    /* Badge Styles */
+    .badge-gradient {
+        background: var(--gradient-primary);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-success {
+        background: var(--gradient-success);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-warning {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-danger {
+        background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Input Styles */
+    .input-modern {
+        background: var(--glass-bg);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        border-radius: 0.75rem;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .input-modern:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+    }
+
+    /* Animated Background */
+    .bg-animated {
+        background: linear-gradient(-45deg, #667eea, #764ba2, #06b6d4, #8b5cf6);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
+    }
+
+    /* Chat Bubble Styles */
+    .chat-bubble-user {
+        background: var(--gradient-primary);
+        color: white;
+        border-radius: 1rem 1rem 0.25rem 1rem;
+    }
+
+    .chat-bubble-ai {
+        background: var(--glass-bg);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--glass-border);
+        color: #1e293b;
+        border-radius: 1rem 1rem 1rem 0.25rem;
+    }
+
+    /* Glow Effect */
+    .glow {
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+    }
+
+    .glow-secondary {
+        box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+    }
+
+    /* Table Styles */
+    .table-modern {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        border-radius: 1rem;
+        overflow: hidden;
+    }
+
+    .table-modern th {
+        background: rgba(139, 92, 246, 0.1);
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    .table-modern td {
+        padding: 1rem;
+        border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+    }
+
+    .table-modern tr:last-child td {
+        border-bottom: none;
+    }
+
+    .table-modern tr:hover td {
+        background: rgba(139, 92, 246, 0.05);
+    }
+
+    /* Form Input Styles - Date, Time, Select */
+    .form-input,
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    select {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-color: white;
+        border: 0;
+        border-radius: 0.75rem;
+        padding: 0.625rem 1rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: #1f2937;
+        box-shadow: inset 0 0 0 1px rgba(209, 213, 219, 1);
+        transition: all 0.2s ease;
+    }
+
+    .dark input[type="date"],
+    .dark input[type="time"],
+    .dark input[type="datetime-local"],
+    .dark select {
+        background-color: rgb(51 65 85);
+        color: white;
+        box-shadow: inset 0 0 0 1px rgb(71 85 105);
+    }
+
+    input[type="date"]:focus,
+    input[type="time"]:focus,
+    input[type="datetime-local"]:focus,
+    select:focus {
+        outline: none;
+        box-shadow: inset 0 0 0 2px rgb(139 92 246);
+    }
+
+    /* Custom Calendar Icon for Date Input */
+    input[type="date"]::-webkit-calendar-picker-indicator,
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        border-radius: 0.25rem;
+        padding: 0.25rem;
+        filter: none;
+        opacity: 0.7;
+        transition: opacity 0.2s ease;
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator:hover,
+    input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+        opacity: 1;
+        background-color: rgba(139, 92, 246, 0.1);
+    }
+
+    .dark input[type="date"]::-webkit-calendar-picker-indicator,
+    .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+    }
+
+    /* Custom Clock Icon for Time Input */
+    input[type="time"]::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        border-radius: 0.25rem;
+        padding: 0.25rem;
+        filter: none;
+        opacity: 0.7;
+        transition: opacity 0.2s ease;
+    }
+
+    input[type="time"]::-webkit-calendar-picker-indicator:hover {
+        opacity: 1;
+        background-color: rgba(139, 92, 246, 0.1);
+    }
+
+    .dark input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+    }
+
+    /* Custom Select Arrow */
+    select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.5rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em 1.5em;
+        padding-right: 2.5rem;
+    }
+
+    .dark select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%9ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    }
+
+    /* Select Option Styling */
+    select option {
+        background-color: white;
+        color: #1f2937;
+        padding: 0.5rem;
+    }
+
+    .dark select option {
+        background-color: rgb(51 65 85);
+        color: white;
+    }
+
+    /* Disabled state */
+    input[type="date"]:disabled,
+    input[type="time"]:disabled,
+    input[type="datetime-local"]:disabled,
+    select:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+/* Animation Utilities */
+@layer utilities {
+    .animation-delay-100 {
+        animation-delay: 100ms;
+    }
+
+    .animation-delay-200 {
+        animation-delay: 200ms;
+    }
+
+    .animation-delay-300 {
+        animation-delay: 300ms;
+    }
+
+    .animation-delay-500 {
+        animation-delay: 500ms;
+    }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(139, 92, 246, 0.1);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #8b5cf6, #06b6d4);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #7c3aed, #0891b2);
+}

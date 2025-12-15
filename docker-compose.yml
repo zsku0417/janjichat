@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  pgsql:
+    image: pgvector/pgvector:pg16
+    container_name: whatsapp_chatbot_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: whatsapp_chatbot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
