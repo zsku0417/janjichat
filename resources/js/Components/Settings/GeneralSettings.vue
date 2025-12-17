@@ -21,6 +21,8 @@ const form = useForm({
     confirmation_template: props.settings?.confirmation_template || "",
     reminder_template: props.settings?.reminder_template || "",
     reminder_hours_before: props.settings?.reminder_hours_before || 24,
+    email_on_escalation: props.settings?.email_on_escalation ?? true,
+    notification_email: props.settings?.notification_email || "",
 });
 
 const saveSettings = () => {
@@ -167,6 +169,60 @@ const saveSettings = () => {
                     How many hours before the booking should the reminder be
                     sent? (Default: 24 hours)
                 </p>
+            </div>
+        </div>
+
+        <!-- Email Notification Settings -->
+        <div class="border-t border-gray-200 dark:border-slate-700 pt-6">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                📧 Email Notifications
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Email Toggle -->
+                <div class="flex items-start gap-4">
+                    <div class="flex h-6 items-center">
+                        <input
+                            v-model="form.email_on_escalation"
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600"
+                        />
+                    </div>
+                    <div>
+                        <label
+                            class="text-sm font-medium text-gray-900 dark:text-white"
+                        >
+                            Email me when conversation escalates
+                        </label>
+                        <p
+                            class="mt-1 text-xs text-gray-500 dark:text-gray-400"
+                        >
+                            Receive email when AI cannot answer a question or
+                            customer requests human support.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Notification Email -->
+                <div>
+                    <label
+                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                    >
+                        Notification Email
+                    </label>
+                    <input
+                        v-model="form.notification_email"
+                        type="email"
+                        placeholder="Leave empty to use your account email"
+                        class="w-full px-4 py-2.5 rounded-xl border-0 bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-slate-600 focus:ring-2 focus:ring-primary-500"
+                        :disabled="!form.email_on_escalation"
+                        :class="{ 'opacity-50': !form.email_on_escalation }"
+                    />
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Email to receive escalation notifications. Includes last
+                        10 messages and direct link.
+                    </p>
+                </div>
             </div>
         </div>
 

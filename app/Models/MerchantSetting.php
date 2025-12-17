@@ -19,10 +19,13 @@ class MerchantSetting extends Model
         'confirmation_template',
         'reminder_template',
         'reminder_hours_before',
+        'email_on_escalation',
+        'notification_email',
     ];
 
     protected $casts = [
         'reminder_hours_before' => 'integer',
+        'email_on_escalation' => 'boolean',
     ];
 
     /**

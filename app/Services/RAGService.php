@@ -19,7 +19,7 @@ class RAGService
     public function __construct(OpenAIService $openAI)
     {
         $this->openAI = $openAI;
-        $this->confidenceThreshold = config('openai.confidence_threshold', 0.7);
+        $this->confidenceThreshold = config('openai.confidence_threshold', 0.2);
     }
 
     /**

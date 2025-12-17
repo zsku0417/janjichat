@@ -41,7 +41,7 @@ return [
     | a knowledge base match as relevant. Lower values = more lenient.
     |
     */
-    'confidence_threshold' => env('AI_CONFIDENCE_THRESHOLD', 0.7),
+    'confidence_threshold' => env('AI_CONFIDENCE_THRESHOLD', 0.2),
 
     /*
     |--------------------------------------------------------------------------

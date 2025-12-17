@@ -41,6 +41,8 @@ class MerchantSettingsController extends Controller
                 'confirmation_template' => $merchantSetting->confirmation_template,
                 'reminder_template' => $merchantSetting->reminder_template,
                 'reminder_hours_before' => $merchantSetting->reminder_hours_before,
+                'email_on_escalation' => $merchantSetting->email_on_escalation ?? true,
+                'notification_email' => $merchantSetting->notification_email,
             ],
         ];
 
@@ -104,6 +106,8 @@ class MerchantSettingsController extends Controller
             'confirmation_template' => 'nullable|string|max:2000',
             'reminder_template' => 'nullable|string|max:2000',
             'reminder_hours_before' => 'nullable|integer|min:1|max:168',
+            'email_on_escalation' => 'boolean',
+            'notification_email' => 'nullable|email|max:255',
         ]);
 
         $user = auth()->user();

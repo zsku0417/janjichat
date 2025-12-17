@@ -95,7 +95,7 @@ class Conversation extends Model
     }
 
     /**
-     * Switch conversation to admin mode.
+     * Switch conversation to admin mode and optionally send email notification.
      */
     public function escalateToAdmin(string $reason): void
     {
@@ -104,6 +104,51 @@ class Conversation extends Model
             'needs_reply' => true,
             'escalation_reason' => $reason,
         ]);
+
+        // Send email notification if enabled
+        $this->sendEscalationEmail($reason);
+    }
+
+    /**
+     * Send escalation email notification to merchant.
+     */
+    protected function sendEscalationEmail(string $reason): void
+    {
+        try {
+            // Get merchant for this conversation
+            $merchant = User::where('role', User::ROLE_MERCHANT)->first();
+            if (!$merchant) {
+                return;
+            }
+
+            $settings = $merchant->merchantSettings;
+
+            // Check if email notifications are enabled
+            if (!$settings || !$settings->email_on_escalation) {
+                return;
+            }
+
+            // Determine recipient email
+            $recipientEmail = $settings->notification_email ?? $merchant->email;
+            if (!$recipientEmail) {
+                return;
+            }
+
+            // Send the email (queued for async)
+            \Illuminate\Support\Facades\Mail::to($recipientEmail)
+                ->send(new \App\Mail\EscalationNotification($this, $reason));
+
+            \Illuminate\Support\Facades\Log::info('Escalation email sent', [
+                'conversation_id' => $this->id,
+                'recipient' => $recipientEmail,
+                'reason' => $reason,
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to send escalation email', [
+                'conversation_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
