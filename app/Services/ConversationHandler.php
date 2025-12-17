@@ -20,6 +20,12 @@ use Exception;
  */
 class ConversationHandler
 {
+    // Response message constants
+    public const MSG_ESCALATION = "I'll connect you with our team. Someone will be with you shortly.";
+    public const MSG_CANCEL_DECLINED = "No problem! Let me know if you need anything else. 😊";
+    public const MSG_CHANGES_CANCELLED = "Okay, no changes made. Let me know if you need anything else!";
+    public const MSG_DEFAULT_GREETING = "Hi! Welcome";
+
     protected WhatsAppService $whatsApp;
     protected RAGService $rag;
     protected BookingService $booking;
@@ -76,7 +82,24 @@ class ConversationHandler
     {
         try {
             // Get or create conversation
-            $conversation = $this->getOrCreateConversation($messageData);
+            $result = $this->getOrCreateConversation($messageData);
+            $conversation = $result['conversation'];
+            $isNew = $result['isNew'];
+
+            // Send greeting for first message in conversation
+            // Check if conversation has no prior messages (fresh start or cleared)
+            $isFirstMessage = $isNew || $conversation->messages()->count() === 0;
+
+            // Send greeting FIRST, then continue to AI processing
+            // Customer gets 2 messages: 1. Greeting 2. AI response
+            if ($isFirstMessage) {
+                $this->sendInitialGreeting($conversation);
+
+                Log::info('First message in conversation - greeting sent, will also process with AI', [
+                    'conversation_id' => $conversation->id,
+                    'is_new_conversation' => $isNew,
+                ]);
+            }
 
             // Store the incoming message
             $message = $this->storeMessage($conversation, $messageData);
@@ -118,10 +141,12 @@ class ConversationHandler
 
     /**
      * Get existing conversation or create a new one.
+     * Returns array with conversation and isNew flag.
      */
-    protected function getOrCreateConversation(array $messageData): Conversation
+    protected function getOrCreateConversation(array $messageData): array
     {
         $conversation = Conversation::where('whatsapp_id', $messageData['from'])->first();
+        $isNew = false;
 
         if (!$conversation) {
             $conversation = Conversation::create([
@@ -133,6 +158,8 @@ class ConversationHandler
                 'last_message_at' => now(),
             ]);
 
+            $isNew = true;
+
             Log::info('New conversation created', [
                 'conversation_id' => $conversation->id,
                 'phone' => $messageData['from'],
@@ -141,7 +168,7 @@ class ConversationHandler
             $conversation->update(['customer_name' => $messageData['contact_name']]);
         }
 
-        return $conversation;
+        return ['conversation' => $conversation, 'isNew' => $isNew];
     }
 
     /**
@@ -187,7 +214,25 @@ class ConversationHandler
         $merchant = $this->getMerchantForConversation($conversation);
         $handler = $this->getHandler($merchant);
 
-        // Step 0: Check if there's an active conversation context that needs handling
+        // Step 0: Check for talk_to_human intent FIRST (before context handling)
+        $businessType = $merchant?->business_type ?? 'restaurant';
+        $talkToHumanResult = $this->rag->detectIntent($content, $conversation, $businessType);
+
+        if ($talkToHumanResult['intent'] === 'talk_to_human') {
+            // Escalate to admin
+            $conversation->escalateToAdmin("Customer requested to talk to a human");
+
+            // Send acknowledgment
+            $this->sendResponse($conversation, self::MSG_ESCALATION);
+
+            Log::info('Customer requested human support', [
+                'conversation_id' => $conversation->id,
+            ]);
+
+            return true;
+        }
+
+        // Step 1: Check if there's an active conversation context that needs handling
         $context = $conversation->getContext();
         if ($context) {
             // First try handler-specific context handling
@@ -236,9 +281,7 @@ class ConversationHandler
      */
     protected function getMerchantForConversation(Conversation $conversation): ?User
     {
-        // TODO: In multi-tenant, get from conversation->user relationship
-        // For now, get the first user as the merchant
-        return User::first();
+        return $conversation->merchant;
     }
 
     /**
@@ -278,7 +321,7 @@ class ConversationHandler
                     return true;
                 } elseif ($responseType === 'negative') {
                     $conversation->clearContext();
-                    $this->sendResponse($conversation, "No problem! Let me know if you need anything else. 😊");
+                    $this->sendResponse($conversation, self::MSG_CANCEL_DECLINED);
                     return true;
                 }
                 break;
@@ -296,7 +339,7 @@ class ConversationHandler
                     // TODO: Add order cancellation handling when implemented
                 } elseif ($responseType === 'negative') {
                     $conversation->clearContext();
-                    $this->sendResponse($conversation, "Okay, no changes made. Let me know if you need anything else!");
+                    $this->sendResponse($conversation, self::MSG_CHANGES_CANCELLED);
                     return true;
                 }
                 break;
@@ -434,6 +477,50 @@ PROMPT;
                 'conversation_id' => $conversation->id,
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Send initial greeting message for new conversations.
+     * Priority: greeting_message > "Hi! Welcome to {business_name}" > "Hi! Welcome"
+     */
+    protected function sendInitialGreeting(Conversation $conversation): void
+    {
+        try {
+            // Get merchant for this conversation (works in webhook context)
+            $merchant = $this->getMerchantForConversation($conversation);
+            $merchantSetting = $merchant?->merchantSettings;
+
+            // Determine greeting message
+            $greeting = null;
+
+            if ($merchantSetting && !empty($merchantSetting->greeting_message)) {
+                // Priority 1: Use custom greeting message
+                $greeting = $merchantSetting->greeting_message;
+            } elseif ($merchantSetting && !empty($merchantSetting->business_name)) {
+                // Priority 2: Use business name
+                $greeting = "Hi! Welcome to {$merchantSetting->business_name}";
+            } else {
+                // Priority 3: Default fallback
+                $greeting = self::MSG_DEFAULT_GREETING;
+            }
+
+            // Send greeting
+            $this->sendResponse($conversation, $greeting);
+
+            Log::info('Initial greeting sent', [
+                'conversation_id' => $conversation->id,
+                'merchant_id' => $merchant?->id,
+                'greeting_used' => !empty($merchantSetting?->greeting_message) ? 'custom' : (!empty($merchantSetting?->business_name) ? 'business_name' : 'default'),
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Failed to send initial greeting', [
+                'conversation_id' => $conversation->id,
+                'error' => $e->getMessage(),
+            ]);
+            // Send default greeting as fallback
+            $this->sendResponse($conversation, self::MSG_DEFAULT_GREETING);
         }
     }
 

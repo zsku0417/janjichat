@@ -41,10 +41,10 @@ class WhatsAppService
             $this->phoneNumberId = $merchant->whatsapp_phone_number_id;
             $this->accessToken = $merchant->whatsapp_access_token;
 
-            Log::debug('WhatsApp credentials loaded from merchant', [
-                'merchant_id' => $merchant->id,
-                'merchant_name' => $merchant->name,
-            ]);
+            // Log::debug('WhatsApp credentials loaded from merchant', [
+            //     'merchant_id' => $merchant->id,
+            //     'merchant_name' => $merchant->name,
+            // ]);
         } else {
             // Fallback to .env config
             $this->phoneNumberId = config('whatsapp.phone_number_id');

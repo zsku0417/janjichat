@@ -73,6 +73,11 @@ const props = defineProps({
         type: String,
         default: "id",
     },
+    // Show row numbers
+    showRowNumbers: {
+        type: Boolean,
+        default: true,
+    },
 });
 
 const emit = defineEmits(["sort", "search", "page-change", "action"]);
@@ -342,6 +347,13 @@ if (typeof window !== "undefined") {
                         <tr
                             class="bg-gradient-to-r from-primary-500/5 to-secondary-500/5 dark:from-primary-500/10 dark:to-secondary-500/10 border-b border-gray-100 dark:border-slate-700"
                         >
+                            <!-- Row Number Header -->
+                            <th
+                                v-if="showRowNumbers"
+                                class="px-4 py-4 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider w-16"
+                            >
+                                #
+                            </th>
                             <th
                                 v-for="column in columns"
                                 :key="column.key"
@@ -411,6 +423,21 @@ if (typeof window !== "undefined") {
                             :key="row[rowKey] || index"
                             class="hover:bg-white/50 dark:hover:bg-slate-700/30 transition-colors"
                         >
+                            <!-- Row Number Cell -->
+                            <td
+                                v-if="showRowNumbers"
+                                class="px-4 py-4 text-sm text-center text-gray-500 dark:text-gray-400 font-medium"
+                            >
+                                {{
+                                    ((serverPagination?.current_page ||
+                                        currentPage) -
+                                        1) *
+                                        perPage +
+                                    index +
+                                    1
+                                }}
+                            </td>
+
                             <td
                                 v-for="column in columns"
                                 :key="column.key"
@@ -490,6 +517,28 @@ if (typeof window !== "undefined") {
                     class="p-4 hover:bg-white/50 dark:hover:bg-slate-700/30 transition-colors"
                 >
                     <div class="space-y-3">
+                        <!-- Row Number for Mobile -->
+                        <div
+                            v-if="showRowNumbers"
+                            class="flex justify-between items-center pb-2 border-b border-gray-100 dark:border-slate-700"
+                        >
+                            <span
+                                class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                                >#</span
+                            >
+                            <span
+                                class="text-sm font-bold text-primary-600 dark:text-primary-400"
+                            >
+                                {{
+                                    ((serverPagination?.current_page ||
+                                        currentPage) -
+                                        1) *
+                                        perPage +
+                                    index +
+                                    1
+                                }}
+                            </span>
+                        </div>
                         <div
                             v-for="column in columns"
                             :key="column.key"

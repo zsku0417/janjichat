@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\DocumentChunk;
 use App\Models\Conversation;
+use App\Models\MerchantSetting;
 use App\Models\RestaurantSetting;
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -208,9 +210,16 @@ class RAGService
     protected function buildSystemPrompt(string $context, string $businessType = 'restaurant'): string
     {
         $settings = RestaurantSetting::getInstance();
-        $tone = $settings->ai_tone ?? 'You are a friendly and professional assistant.';
-        $businessName = $settings->name ?? 'Our Business';
-        $operatingHours = "{$settings->formatted_opening_time} - {$settings->formatted_closing_time}";
+
+        // Get merchant settings for ai_tone and business_name
+        $merchant = User::where('role', User::ROLE_MERCHANT)->first();
+        $merchantSettings = $merchant ? MerchantSetting::where('user_id', $merchant->id)->first() : null;
+
+        $tone = $merchantSettings?->ai_tone ?? 'You are a friendly and professional assistant.';
+        $businessName = $merchantSettings?->business_name ?? 'Our Business';
+        $openingTime = $settings?->formatted_opening_time ?? '10:00 AM';
+        $closingTime = $settings?->formatted_closing_time ?? '10:00 PM';
+        $operatingHours = "{$openingTime} - {$closingTime}";
 
         // Get business-specific configuration
         $config = $this->getBusinessConfig($businessType);
@@ -378,7 +387,7 @@ PROMPT;
                 'contextRules' => '- If the conversation shows an order was just placed and the customer is now asking to add/change something, this is an "order_modify" NOT a new "order_request"
 - If the customer says "I want to order" or similar with no prior order in the conversation, this is an "order_request"
 - If the customer has an existing order (shown in conversation) and wants to cancel it, this is "order_cancel"',
-                'intentList' => 'greeting, general_question, order_request, order_inquiry, order_modify, order_cancel, other',
+                'intentList' => 'talk_to_human, greeting, general_question, order_request, order_inquiry, order_modify, order_cancel, other',
                 'entities' => '{
         "name": "extracted name if mentioned",
         "products": "list of products mentioned",
@@ -389,7 +398,8 @@ PROMPT;
         "special_request": "any special requests mentioned"
     }',
                 'questionSubject' => 'products or services',
-                'intentDefinitions' => '- order_request: Customer wants to place a NEW order (no prior order in this conversation)
+                'intentDefinitions' => '- talk_to_human: **HIGHEST PRIORITY** Customer wants to speak to a real person/human/staff (English: "talk to human", "speak to someone", "customer service", "real person" | Malay: "nak cakap dengan orang", "boleh cakap dengan staff" | Chinese: "我要跟人说话", "找真人", "人工客服")
+- order_request: Customer wants to place a NEW order (no prior order in this conversation)
 - order_modify: Customer wants to CHANGE or ADD something to their existing/recent order
 - order_inquiry: Customer asking about their existing order status or details
 - order_cancel: Customer wants to cancel an order',
@@ -399,10 +409,12 @@ PROMPT;
         // Default: Restaurant
         return [
             'businessLabel' => 'restaurant',
-            'contextRules' => '- If the conversation shows a booking was just confirmed and the customer is now asking to add/change something (like decorations, special requests, seating preferences), this is a "booking_modify" NOT a new "booking_request"
-- If the customer says "I want to book" or similar with no prior booking in the conversation, this is a "booking_request"
+            'contextRules' => '- IMPORTANT: "Can I make another booking?" or "I want to book again" or "book多一个" is a BOOKING_REQUEST, not an inquiry - the customer wants to CREATE a new reservation
+- If the conversation shows a booking was just confirmed and the customer is now asking to add/change something (like decorations, special requests, seating preferences), this is a "booking_modify" NOT a new "booking_request"
+- If the customer says "I want to book" or "make a reservation" with no prior booking OR says they want to make ANOTHER booking, this is a "booking_request"
+- "booking_inquiry" is ONLY for checking STATUS of existing bookings (e.g., "check my booking", "when is my reservation", "what time is my booking")
 - If the customer has an existing booking (shown in conversation) and wants to cancel it, this is "booking_cancel"',
-            'intentList' => 'greeting, general_question, booking_request, booking_inquiry, booking_modify, booking_cancel, other',
+            'intentList' => 'talk_to_human, greeting, general_question, booking_request, booking_inquiry, booking_modify, booking_cancel, other',
             'entities' => '{
         "name": "extracted name if mentioned",
         "date": "extracted date if mentioned (YYYY-MM-DD format)",
@@ -411,9 +423,10 @@ PROMPT;
         "special_request": "any special requests mentioned (decorations, seating preferences, celebrations, dietary requirements, etc.)"
     }',
             'questionSubject' => 'the restaurant',
-            'intentDefinitions' => '- booking_request: Customer wants to make a NEW reservation (no prior booking in this conversation)
-- booking_modify: Customer wants to CHANGE or ADD something to their existing/recent booking
-- booking_inquiry: Customer asking about their existing booking status or details
+            'intentDefinitions' => '- talk_to_human: **HIGHEST PRIORITY** Customer wants to speak to a real person/human/staff (English: "talk to human", "speak to someone", "customer service", "real person" | Malay: "nak cakap dengan orang", "boleh cakap dengan staff" | Chinese: "我要跟人说话", "找真人", "人工客服")
+- booking_request: Customer wants to make a NEW reservation OR make ANOTHER reservation (includes: "I want to book", "make a reservation", "can I book?", "book another one", "book多一个", "想订位")
+- booking_modify: Customer wants to CHANGE or ADD something to their existing/recent booking (e.g., change time, add special request)
+- booking_inquiry: Customer asking to CHECK STATUS of existing booking (e.g., "check my booking", "when is my reservation?", "what time is my booking?", "我的预订是什么时候")
 - booking_cancel: Customer wants to cancel a booking',
         ];
     }
@@ -436,8 +449,10 @@ PROMPT;
         Conversation $conversation,
         string $businessType = 'restaurant'
     ): string {
-        $settings = RestaurantSetting::getInstance();
-        $aiTone = $settings->ai_tone ?? 'friendly and professional';
+        // Get ai_tone from MerchantSetting
+        $merchant = $conversation->merchant;
+        $merchantSettings = $merchant ? MerchantSetting::where('user_id', $merchant->id)->first() : null;
+        $aiTone = $merchantSettings?->ai_tone ?? 'friendly and professional';
 
         // Get conversation history for context
         $historyContext = '';
@@ -489,6 +504,30 @@ PROMPT;
     {
         $context = "";
 
+        // Include merchant templates if provided
+        if (isset($data['booking_form_template'])) {
+            $context .= "BOOKING FORM TEMPLATE (Use this when customer wants to make a booking):\n";
+            $context .= $data['booking_form_template'] . "\n\n";
+        }
+
+        if (isset($data['confirmation_template'])) {
+            $context .= "BOOKING CONFIRMATION TEMPLATE:\n";
+            $context .= $data['confirmation_template'] . "\n\n";
+        }
+
+        if (isset($data['reminder_template'])) {
+            $context .= "BOOKING REMINDER TEMPLATE:\n";
+            $context .= $data['reminder_template'] . "\n\n";
+        }
+
+        if (isset($data['business_name'])) {
+            $context .= "BUSINESS NAME: " . $data['business_name'] . "\n\n";
+        }
+
+        if (isset($data['greeting_message'])) {
+            $context .= "GREETING MESSAGE: " . $data['greeting_message'] . "\n\n";
+        }
+
         if (isset($data['bookings']) && is_array($data['bookings'])) {
             $context .= "CUSTOMER'S BOOKINGS:\n";
             foreach ($data['bookings'] as $booking) {
@@ -496,9 +535,11 @@ PROMPT;
                 $context .= "  Date: {$booking['date']}\n";
                 $context .= "  Time: {$booking['time']}\n";
                 $context .= "  Guests: {$booking['pax']}\n";
-                $context .= "  Table: {$booking['table']}\n";
-                if (!empty($booking['special_request'])) {
-                    $context .= "  Special Request: {$booking['special_request']}\n";
+                if (isset($booking['table'])) {
+                    $context .= "  Table: {$booking['table']}\n";
+                }
+                if (isset($booking['special_requests'])) {
+                    $context .= "  Special Requests: {$booking['special_requests']}\n";
                 }
                 $context .= "\n";
             }
@@ -534,7 +575,34 @@ PROMPT;
     }
 
     /**
-     * Build the prompt for contextual response generation.
+     * Get intent-specific guidance for AI response generation.
+     */
+    protected function getIntentGuidance(string $intent, string $businessType): string
+    {
+        if ($businessType === 'restaurant') {
+            return match ($intent) {
+                'booking_request' => "The customer wants to make a booking. IMPORTANT: Show ONLY the booking form template - do NOT repeat, summarize, or reference previous conversation topics. Just acknowledge briefly and show the booking form.",
+                'booking_inquiry' => "The customer is asking about their booking. Show them their booking details in a friendly way.",
+                'booking_modify' => "The customer wants to modify their booking. If they provided new details (date/time/pax), confirm the changes. If they just said 'reschedule' without new details, show their current booking and ask what they'd like to change.",
+                'booking_cancel' => "The customer wants to cancel. Show their booking and ask for confirmation before canceling.",
+                'general_question' => "Answer the customer's question using available information.",
+                default => "Help the customer with their request.",
+            };
+        }
+
+        // Order tracking
+        return match ($intent) {
+            'order_request' => "The customer wants to place an order. Guide them through the ordering process.",
+            'order_inquiry' => "The customer is asking about their order. Show them order status and details.",
+            'order_modify' => "The customer wants to modify their order. Show current order and help them make changes.",
+            'order_cancel' => "The customer wants to cancel their order. Confirm before canceling.",
+            'general_question' => "Answer the customer's question using available information.",
+            default => "Help the customer with their request.",
+        };
+    }
+
+    /**
+     * Build detailed prompt for contextual AI response generation.
      */
     protected function buildContextualResponsePrompt(
         string $intent,
@@ -545,44 +613,43 @@ PROMPT;
         string $businessType
     ): string {
         $businessLabel = $businessType === 'order_tracking' ? 'business' : 'restaurant';
-
-        $intentGuidance = match ($intent) {
-            'booking_modify' => "The customer wants to modify their booking. If they provided new details (date/time/pax), confirm the changes. If they just said 'reschedule' without new details, show their current booking and ask what they'd like to change.",
-            'booking_inquiry' => "The customer is asking about their booking. Show them their booking details in a friendly way.",
-            'booking_cancel' => "The customer wants to cancel. Show their booking and ask for confirmation before canceling.",
-            'booking_request', 'greeting' => "The customer wants to make a new booking. Guide them through the booking process.",
-            'order_inquiry' => "The customer is asking about their order. Show them order status and details.",
-            'general_question' => "Answer the customer's question using available information.",
-            default => "Help the customer with their request.",
-        };
+        $intentGuidance = $this->getIntentGuidance($intent, $businessType);
 
         return <<<PROMPT
-You are a helpful {$businessLabel} assistant. Your personality: {$aiTone}
+                    You are a helpful {$businessLabel} assistant. Your personality: {$aiTone}
 
-CONVERSATION HISTORY:
-{$historyContext}
+                    CONVERSATION HISTORY:
+                    {$historyContext}
 
-CUSTOMER'S LATEST MESSAGE:
-"{$customerMessage}"
+                    CUSTOMER'S LATEST MESSAGE:
+                    "{$customerMessage}"
 
-DETECTED INTENT: {$intent}
-{$intentGuidance}
+                    DETECTED INTENT: {$intent}
+                    {$intentGuidance}
 
-BUSINESS DATA:
-{$dataContext}
+                    BUSINESS DATA:
+                    {$dataContext}
 
-INSTRUCTIONS:
-1. **LANGUAGE**: Detect the language of the customer's message and REPLY IN THE SAME LANGUAGE. If customer writes in Chinese, reply in Chinese. If in Malay, reply in Malay. Match their language exactly.
-2. Generate a natural, conversational response
-3. Be warm and helpful, use appropriate emojis sparingly
-4. If showing booking/order details, format them nicely with emojis (📅 for date, ⏰ for time, 👥 for guests)
-5. If you need more information from customer, ask clearly
-6. Keep response concise but complete
-7. NEVER expose technical errors or system details to customer
-8. If action_result shows an error, apologize and offer alternatives
+                    CRITICAL INSTRUCTIONS (MUST FOLLOW):
+                    
+                    1. **LANGUAGE MATCHING (HIGHEST PRIORITY)**:
+                       - Detect the language of the CUSTOMER'S LATEST MESSAGE above
+                       - You MUST reply in the SAME language
+                       - If customer writes in 中文 (Chinese), reply in 中文
+                       - If customer writes in Bahasa Melayu, reply in Bahasa Melayu  
+                       - If customer writes in English, reply in English
+                       - Do NOT mix languages. Do NOT default to English or Malay when customer writes Chinese.
+                    
+                    2. Generate a natural, conversational response
+                    3. Be warm and helpful, use appropriate emojis sparingly
+                    4. If showing booking/order details, format them nicely with emojis (📅 for date, ⏰ for time, 👥 for guests)
+                    5. If you need more information from customer, ask clearly
+                    6. Keep response concise but complete
+                    7. NEVER expose technical errors or system details to customer
+                    8. If action_result shows an error, apologize and offer alternatives
 
-Respond directly as the assistant (no JSON, no prefix, just the message):
-PROMPT;
+                    Respond directly as the assistant (no JSON, no prefix, just the message):
+                PROMPT;
     }
 }
 

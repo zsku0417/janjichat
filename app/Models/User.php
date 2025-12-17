@@ -159,7 +159,7 @@ class User extends Authenticatable
     /**
      * Get the merchant settings for this user.
      */
-    public function merchantSetting(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function merchantSettings(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(MerchantSetting::class);
     }

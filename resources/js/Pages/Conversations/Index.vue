@@ -515,15 +515,6 @@ const handleKeydown = (e) => {
     }
 };
 
-// Check if admin has responded to escalation
-const hasAdminResponded = computed(() => {
-    if (!messagesData.value || messagesData.value.length === 0) return false;
-    // Find if there's any admin message after the escalation
-    return messagesData.value.some(
-        (m) => m.direction === "outbound" && m.sender_type === "admin"
-    );
-});
-
 // Mobile: selected conversation view state
 const showMobileChat = ref(false);
 
@@ -1039,8 +1030,7 @@ const closeMobileChat = () => {
                             <div
                                 v-if="
                                     conversationData.escalation_reason &&
-                                    conversationData.needs_reply &&
-                                    !hasAdminResponded
+                                    conversationData.needs_reply
                                 "
                                 class="mx-4 lg:mx-6 mt-4 rounded-xl bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-800 p-4"
                             >

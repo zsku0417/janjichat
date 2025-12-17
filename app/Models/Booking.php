@@ -12,6 +12,7 @@ class Booking extends Model
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'conversation_id',
         'table_id',
         'customer_name',
@@ -89,8 +90,11 @@ class Booking extends Model
             return false;
         }
 
-        $settings = RestaurantSetting::getInstance();
-        $reminderTime = $this->booking_date_time->subHours($settings->reminder_hours_before);
+        // Get reminder_hours_before from MerchantSetting via conversation
+        $merchant = $this->conversation?->merchant;
+        $merchantSettings = $merchant ? MerchantSetting::where('user_id', $merchant->id)->first() : null;
+        $reminderHours = $merchantSettings?->reminder_hours_before ?? 24;
+        $reminderTime = $this->booking_date_time->subHours($reminderHours);
 
         return now()->gte($reminderTime) && now()->lt($this->booking_date_time);
     }

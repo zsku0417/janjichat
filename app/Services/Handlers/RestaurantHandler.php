@@ -49,10 +49,13 @@ class RestaurantHandler implements BusinessHandlerInterface
 
     /**
      * Send a response using the callback.
+     * Converts escaped newlines (literal \n) to real newlines for proper formatting.
      */
     protected function sendResponse(Conversation $conversation, string $content): void
     {
         if ($this->sendResponseCallback) {
+            // Convert escaped newlines to real newlines (AI sometimes returns literal \n)
+            $content = str_replace(['\\n', '\n'], "\n", $content);
             call_user_func($this->sendResponseCallback, $conversation, $content);
         }
     }
@@ -101,26 +104,44 @@ class RestaurantHandler implements BusinessHandlerInterface
 
             case 'general_question':
             default:
-                // Check if they might want to book based on keywords
-                if ($this->looksLikeBusinessIntent($content)) {
-                    $this->handleGreeting($conversation, $merchant);
-                } else {
-                    // Return false to indicate this should be handled by general question handler
-                    // The ConversationHandler will handle this
-                    return;
-                }
-                break;
+                // Let ConversationHandler handle general questions
+                // AI intent detection is trusted - if customer wanted to book, it would detect 'booking_request'
+                return;
         }
     }
 
     /**
-     * Handle greeting for restaurant - show booking form.
+     * Handle greeting for restaurant - let AI generate natural response with template awareness.
      */
     public function handleGreeting(Conversation $conversation, User $merchant): void
     {
-        $bookingForm = $this->booking->getBookingFormTemplate($merchant);
+        // Get merchant settings templates
+        $merchantSettings = $merchant->merchantSettings;
+        $bookingFormTemplate = $merchantSettings?->booking_form_template;
 
-        $this->sendResponse($conversation, $bookingForm);
+        // If no custom template, use default
+        if (empty($bookingFormTemplate)) {
+            $bookingFormTemplate = $this->booking->getBookingFormTemplate($merchant);
+        }
+
+        // Prepare business data for AI context
+        // Note: greeting_message is NOT included here - it's sent separately for new conversations
+        // Including it would cause AI to mix greeting into booking responses inappropriately
+        $businessData = [
+            'booking_form_template' => $bookingFormTemplate,
+            'business_name' => $merchantSettings?->business_name ?? $merchant->name,
+        ];
+
+        // Let AI generate a natural response that incorporates the booking form
+        $aiResponse = $this->rag->generateContextualResponse(
+            'booking_request',
+            $conversation->messages()->orderByDesc('created_at')->first()->content,
+            $businessData,
+            $conversation,
+            'restaurant'
+        );
+
+        $this->sendResponse($conversation, $aiResponse);
 
         // Set context to await booking
         $conversation->setContext(Conversation::CONTEXT_BOOKING_FLOW, [
@@ -189,29 +210,6 @@ class RestaurantHandler implements BusinessHandlerInterface
     }
 
     /**
-     * Get keywords that indicate booking intent.
-     */
-    public function getIntentKeywords(): array
-    {
-        return ['book', 'reserve', 'reservation', 'table', 'booking', 'tempah', 'nak book', 'meja', '预订', '订位', 'pax', 'guests', 'people'];
-    }
-
-    /**
-     * Check if content looks like customer wants to book.
-     */
-    public function looksLikeBusinessIntent(string $content): bool
-    {
-        $normalized = strtolower($content);
-
-        foreach ($this->getIntentKeywords() as $keyword) {
-            if (str_contains($normalized, $keyword)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * Handle a filled booking form attempt.
      */
     public function handleBookingAttempt(Conversation $conversation, string $content, ?User $merchant): void
@@ -253,8 +251,20 @@ class RestaurantHandler implements BusinessHandlerInterface
             // Clear the booking context
             $conversation->clearContext();
         } catch (Exception $e) {
-            // Availability error - show the error message
-            $this->sendResponse($conversation, $e->getMessage());
+            // Log the error but NEVER expose internal errors to customers
+            Log::error('Error during booking confirmation', [
+                'conversation_id' => $conversation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Switch to admin mode so merchant can handle manually
+            $conversation->update([
+                'mode' => 'admin',
+                'need_reply' => true,
+            ]);
+
+            // Do NOT send any response to customer
         }
     }
 
@@ -304,7 +314,20 @@ class RestaurantHandler implements BusinessHandlerInterface
                 $this->sendResponse($conversation, $confirmation);
 
             } catch (Exception $e) {
-                $this->sendResponse($conversation, "Sorry, I couldn't complete your booking: " . $e->getMessage());
+                // Log the error but NEVER expose internal errors to customers
+                Log::error('Error during booking creation', [
+                    'conversation_id' => $conversation->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+
+                // Switch to admin mode so merchant can handle manually
+                $conversation->update([
+                    'mode' => 'admin',
+                    'need_reply' => true,
+                ]);
+
+                // Do NOT send any response to customer
             }
         } else {
             // Ask for missing information
@@ -314,25 +337,42 @@ class RestaurantHandler implements BusinessHandlerInterface
 
     /**
      * Ask for missing booking details.
+     * Uses AI to generate natural, multilingual requests.
      */
     protected function askForBookingDetails(Conversation $conversation, ?string $name, ?string $date, ?string $time, ?int $pax): void
     {
         $missing = [];
 
         if (!$name)
-            $missing[] = 'your name';
+            $missing[] = 'name';
         if (!$date)
-            $missing[] = 'the date';
+            $missing[] = 'date';
         if (!$time)
-            $missing[] = 'the time';
+            $missing[] = 'time';
         if (!$pax)
-            $missing[] = 'the number of guests';
+            $missing[] = 'number of guests';
 
-        $message = "I'd be happy to help you make a reservation! 📅\n\n";
-        $message .= "Could you please provide " . implode(', ', $missing) . "?\n\n";
-        $message .= "For example: \"Book a table for 4 people on December 25th at 7pm under the name John\"";
+        // Get merchant for template access
+        $merchant = $conversation->merchant;
+        $merchantSettings = $merchant?->merchantSettings;
 
-        $this->sendResponse($conversation, $message);
+        // Prepare business data for AI
+        $businessData = [
+            'missing_fields' => $missing,
+            'booking_form_template' => $merchantSettings?->booking_form_template,
+            'business_name' => $merchantSettings?->business_name ?? $merchant?->name,
+        ];
+
+        // Let AI ask for missing details naturally
+        $aiResponse = $this->rag->generateContextualResponse(
+            'booking_request',
+            "Customer wants to book but we're missing: " . implode(', ', $missing),
+            $businessData,
+            $conversation,
+            'restaurant'
+        );
+
+        $this->sendResponse($conversation, $aiResponse);
     }
 
     /**
@@ -341,7 +381,13 @@ class RestaurantHandler implements BusinessHandlerInterface
      */
     public function handleBookingInquiry(Conversation $conversation): void
     {
-        $bookings = $this->booking->getCustomerBookings($conversation->phone_number);
+        // First try to find bookings by conversation_id (most reliable)
+        $bookings = $this->booking->getBookingsByConversation($conversation->id);
+
+        // If no bookings found by conversation, try by phone number
+        if ($bookings->isEmpty() && $conversation->phone_number) {
+            $bookings = $this->booking->getCustomerBookings($conversation->phone_number);
+        }
 
         if ($bookings->isEmpty()) {
             // Set context so "Yes" response will start booking flow
@@ -394,7 +440,13 @@ class RestaurantHandler implements BusinessHandlerInterface
      */
     public function handleBookingModify(Conversation $conversation, string $content): void
     {
-        $bookings = $this->booking->getCustomerBookings($conversation->phone_number);
+        // First try to find bookings by conversation_id (most reliable)
+        $bookings = $this->booking->getBookingsByConversation($conversation->id);
+
+        // If no bookings found by conversation, try by phone number
+        if ($bookings->isEmpty() && $conversation->phone_number) {
+            $bookings = $this->booking->getCustomerBookings($conversation->phone_number);
+        }
 
         if ($bookings->isEmpty()) {
             $response = $this->rag->generateContextualResponse(
@@ -470,10 +522,10 @@ class RestaurantHandler implements BusinessHandlerInterface
             $conversation->clearContext();
         }
 
-        // Parse the current message for explicit new details
-        $newDetails = $this->parseModificationDetails($content);
+        // Use AI to parse what the customer wants to change (multilingual)
+        $newDetails = $this->booking->parseBookingChanges($content, $booking, $conversation);
 
-        Log::info('Modification request', [
+        Log::info('AI parsed modification request', [
             'conversation_id' => $conversation->id,
             'booking_id' => $booking->id,
             'content' => $content,
@@ -508,23 +560,21 @@ class RestaurantHandler implements BusinessHandlerInterface
                 return;
 
             } catch (Exception $e) {
+                // Log the error but NEVER expose internal errors to customers
                 Log::error('Booking modification failed', [
                     'conversation_id' => $conversation->id,
                     'booking_id' => $booking->id,
                     'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
 
-                $response = $this->rag->generateContextualResponse(
-                    'booking_modify',
-                    $content,
-                    [
-                        'bookings' => $bookingData,
-                        'action_result' => 'Error: ' . $e->getMessage(),
-                    ],
-                    $conversation,
-                    'restaurant'
-                );
-                $this->sendResponse($conversation, $response);
+                // Switch to admin mode so merchant can handle manually
+                $conversation->update([
+                    'mode' => 'admin',
+                    'need_reply' => true,
+                ]);
+
+                // Do NOT send any response to customer
                 return;
             }
         }
@@ -656,62 +706,6 @@ class RestaurantHandler implements BusinessHandlerInterface
     }
 
     /**
-     * Parse modification details from the current message.
-     * Only returns values that are explicitly provided in this message.
-     */
-    protected function parseModificationDetails(string $content): array
-    {
-        $changes = [];
-
-        // Check if message actually contains booking details, not just "reschedule"
-        $rescheduleOnly = preg_match('/^(i\s+)?(want\s+to\s+|wish\s+to\s+|would\s+like\s+to\s+)?(reschedule|change|modify|update)(\s+my\s+booking)?\.?$/i', trim($content));
-
-        if ($rescheduleOnly) {
-            return [];
-        }
-
-        // Try to extract date patterns
-        if (preg_match('/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/', $content, $dateMatch)) {
-            $day = $dateMatch[1];
-            $month = $dateMatch[2];
-            $year = $dateMatch[3];
-            if (strlen($year) == 2)
-                $year = '20' . $year;
-            $changes['booking_date'] = "{$year}-{$month}-{$day}";
-        } elseif (preg_match('/(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?/i', $content, $dateMatch)) {
-            $monthName = $dateMatch[1];
-            $day = $dateMatch[2];
-            $year = $dateMatch[3] ?? date('Y');
-            $changes['booking_date'] = Carbon::parse("{$monthName} {$day} {$year}")->format('Y-m-d');
-        } elseif (preg_match('/(tomorrow|next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday))/i', $content, $dateMatch)) {
-            $changes['booking_date'] = Carbon::parse($dateMatch[0])->format('Y-m-d');
-        }
-
-        // Try to extract time patterns
-        if (preg_match('/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i', $content, $timeMatch)) {
-            $hour = (int) $timeMatch[1];
-            $minutes = $timeMatch[2] ?? '00';
-            $period = strtolower($timeMatch[3]);
-            if ($period === 'pm' && $hour < 12)
-                $hour += 12;
-            if ($period === 'am' && $hour == 12)
-                $hour = 0;
-            $changes['booking_time'] = sprintf('%02d:%s:00', $hour, $minutes);
-        } elseif (preg_match('/(\d{1,2}):(\d{2})/', $content, $timeMatch)) {
-            $changes['booking_time'] = sprintf('%02d:%s:00', $timeMatch[1], $timeMatch[2]);
-        }
-
-        // Try to extract pax
-        if (preg_match('/(\d+)\s*(pax|people|persons?|guests?)/i', $content, $paxMatch)) {
-            $changes['pax'] = (int) $paxMatch[1];
-        } elseif (preg_match('/for\s+(\d+)/i', $content, $paxMatch)) {
-            $changes['pax'] = (int) $paxMatch[1];
-        }
-
-        return $changes;
-    }
-
-    /**
      * Handle booking cancellation.
      * Asks user to choose if multiple active bookings exist.
      */
@@ -797,18 +791,23 @@ class RestaurantHandler implements BusinessHandlerInterface
     }
 
     /**
-     * Start a new booking flow by asking for details.
+     * Start a new booking flow by showing booking form template.
+     * Uses merchant's custom template or default.
      */
     public function startBookingFlow(Conversation $conversation): void
     {
-        $settings = RestaurantSetting::getInstance();
+        $merchant = $conversation->merchant;
+        $merchantSettings = $merchant->merchantSettings;
 
-        $response = "Great! Let's make a reservation. 📅\n\n" .
-            "Please tell me:\n" .
-            "• When would you like to book? (e.g., tomorrow, Dec 15)\n" .
-            "• What time? (e.g., 7pm)\n" .
-            "• How many people?";
+        // Use merchant's booking form template if available
+        $bookingFormTemplate = $merchantSettings?->booking_form_template;
 
+        if (empty($bookingFormTemplate)) {
+            // Fallback to default template
+            $bookingFormTemplate = $this->booking->getBookingFormTemplate($merchant);
+        }
+
+        // Set context before sending form
         $conversation->setContext(Conversation::CONTEXT_BOOKING_FLOW, [
             'step' => 'collecting_details',
             'date' => null,
@@ -816,7 +815,7 @@ class RestaurantHandler implements BusinessHandlerInterface
             'pax' => null,
         ]);
 
-        $this->sendResponse($conversation, $response);
+        $this->sendResponse($conversation, $bookingFormTemplate);
     }
 
     /**

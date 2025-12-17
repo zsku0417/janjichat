@@ -47,10 +47,13 @@ class OrderTrackingHandler implements BusinessHandlerInterface
 
     /**
      * Send a response using the callback.
+     * Converts escaped newlines (literal \n) to real newlines for proper formatting.
      */
     protected function sendResponse(Conversation $conversation, string $content): void
     {
         if ($this->sendResponseCallback) {
+            // Convert escaped newlines to real newlines (AI sometimes returns literal \n)
+            $content = str_replace(['\\n', '\n'], "\n", $content);
             call_user_func($this->sendResponseCallback, $conversation, $content);
         }
     }
@@ -92,14 +95,9 @@ class OrderTrackingHandler implements BusinessHandlerInterface
 
             case 'general_question':
             default:
-                // Check if they might want to order based on keywords
-                if ($this->looksLikeBusinessIntent($content)) {
-                    $this->handleGreeting($conversation, $merchant);
-                } else {
-                    // Return to let ConversationHandler handle general questions
-                    return;
-                }
-                break;
+                // Let ConversationHandler handle general questions
+                // AI intent detection is trusted
+                return;
         }
     }
 
@@ -133,29 +131,6 @@ class OrderTrackingHandler implements BusinessHandlerInterface
                 return false;
         }
 
-        return false;
-    }
-
-    /**
-     * Get keywords that indicate order intent.
-     */
-    public function getIntentKeywords(): array
-    {
-        return ['order', 'buy', 'purchase', 'want', 'get', 'beli', 'nak', 'mau', '要', '买', 'menu', 'price', 'harga'];
-    }
-
-    /**
-     * Check if content looks like customer wants to order.
-     */
-    public function looksLikeBusinessIntent(string $content): bool
-    {
-        $normalized = strtolower($content);
-
-        foreach ($this->getIntentKeywords() as $keyword) {
-            if (str_contains($normalized, $keyword)) {
-                return true;
-            }
-        }
         return false;
     }
 

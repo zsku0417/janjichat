@@ -67,6 +67,18 @@ class Conversation extends Model
     }
 
     /**
+     * Get the merchant (user) who owns this conversation.
+     * This is an accessor, not a relationship.
+     * In a multi-tenant setup, this would be a proper belongsTo relationship.
+     */
+    public function getMerchantAttribute(): ?User
+    {
+        // For now, return the first merchant user
+        // TODO: In true multi-tenant, add user_id to conversations table and use belongsTo
+        return User::where('role', User::ROLE_MERCHANT)->first();
+    }
+
+    /**
      * Check if this conversation is in AI mode.
      */
     public function isAiMode(): bool

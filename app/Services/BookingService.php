@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use App\Models\MerchantSetting;
 use App\Models\Table;
 use App\Models\RestaurantSetting;
 use App\Models\Conversation;
@@ -23,11 +24,19 @@ class BookingService
 
     /**
      * Get the booking form template message.
+     * Uses merchant's custom template or falls back to default.
      */
     public function getBookingFormTemplate(User $merchant): string
     {
-        $settings = RestaurantSetting::getInstance();
-        $restaurantName = $settings->name ?? $merchant->name ?? 'Our Restaurant';
+        $merchantSettings = $merchant->merchantSettings;
+
+        // Priority 1: Use custom booking form template from merchant settings
+        if ($merchantSettings && !empty($merchantSettings->booking_form_template)) {
+            return $merchantSettings->booking_form_template;
+        }
+
+        // Priority 2: Generate default template
+        $restaurantName = $merchantSettings->business_name ?? $merchant->name ?? 'Our Restaurant';
 
         return <<<TEMPLATE
 Welcome to {$restaurantName}! 🍽️
@@ -37,7 +46,7 @@ To make a table reservation, please fill in the form below:
 👥 *Number of Guests (Pax):*
 
 📅 *Date & Time:*
-(e.g. 15-12-2024, 7:00pm)
+(e.g. 15-12-2026, 7:00pm)
 
 📞 *Phone Number:*
 
@@ -58,8 +67,8 @@ TEMPLATE;
     public function parseBookingFromMessage(string $message, string $customerPhone, ?string $customerName = null, ?Conversation $conversation = null): ?array
     {
         $settings = RestaurantSetting::getInstance();
-        $openingTime = $settings->formatted_opening_time ?? '10:00 AM';
-        $closingTime = $settings->formatted_closing_time ?? '10:00 PM';
+        $openingTime = $settings?->formatted_opening_time ?? '10:00 AM';
+        $closingTime = $settings?->formatted_closing_time ?? '10:00 PM';
 
         // Get current date info for better relative date parsing
         $currentDate = now()->format('Y-m-d');
@@ -154,35 +163,161 @@ PROMPT;
     }
 
     /**
-     * Check if a message looks like a booking attempt.
+     * Parse booking modification details using AI.
+     * This is smarter than regex - handles any language and understands context.
+     *
+     * @param string $message Customer's message
+     * @param Booking $currentBooking The booking being modified
+     * @param Conversation $conversation For context
+     * @return array|null Parsed changes {booking_date?, booking_time?, pax?} or null if nothing to change
      */
-    public function isBookingAttempt(string $message): bool
+    public function parseBookingChanges(string $message, Booking $currentBooking, Conversation $conversation): ?array
     {
-        // Look for patterns that suggest a booking
-        $bookingPatterns = [
-            '/\b\d+\s*(pax|guests?|people|persons?)\b/i',
-            '/\bpax\s*[:=]?\s*\d+/i',
-            '/\bguests?\s*[:=]?\s*\d+/i',
-            '/\bbook(ing)?.*table/i',
-            '/\btable.*book/i',
-            '/\breservation/i',
-            '/\bspecial\s*request/i',
-            '/\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/i',  // Date patterns
-            '/\d{1,2}[:.]\d{2}\s*(am|pm)?/i',  // Time patterns
-            '/\b(2|3|4|5|6|7|8|9|10|11|12)\s*(am|pm)/i',  // Simple time
-            '/\bphone\s*[:=]?\s*[\d\s+()-]+/i',
-            '/\bname\s*[:=]/i',
-        ];
+        $settings = RestaurantSetting::getInstance();
+        $openingTime = $settings?->formatted_opening_time ?? '10:00 AM';
+        $closingTime = $settings?->formatted_closing_time ?? '10:00 PM';
 
-        $matchCount = 0;
-        foreach ($bookingPatterns as $pattern) {
-            if (preg_match($pattern, $message)) {
-                $matchCount++;
+        $currentDate = now()->format('Y-m-d');
+        $currentDayOfWeek = now()->format('l');
+        $currentYear = now()->format('Y');
+
+        // Build conversation context
+        $conversationContext = '';
+        $recentMessages = $conversation->messages()
+            ->orderBy('created_at', 'desc')
+            ->take(6)
+            ->get()
+            ->reverse();
+
+        if ($recentMessages->isNotEmpty()) {
+            $conversationContext = "\nRECENT CONVERSATION:\n";
+            foreach ($recentMessages as $msg) {
+                $role = $msg->direction === 'inbound' ? 'Customer' : 'Restaurant';
+                $conversationContext .= "{$role}: {$msg->content}\n";
             }
         }
 
-        // Require at least 2 patterns to match (to reduce false positives)
-        return $matchCount >= 2;
+        $currentBookingInfo = "CURRENT BOOKING:\n" .
+            "- Date: " . $currentBooking->booking_date->format('l, F j, Y') . "\n" .
+            "- Time: " . Carbon::parse($currentBooking->booking_time)->format('g:i A') . "\n" .
+            "- Guests: {$currentBooking->pax}\n";
+
+        $prompt = <<<PROMPT
+You are parsing a customer's request to MODIFY their restaurant booking.
+
+{$currentBookingInfo}
+
+Restaurant operating hours: {$openingTime} - {$closingTime}
+
+DATE CONTEXT:
+- Today is {$currentDayOfWeek}, {$currentDate}
+- Current year: {$currentYear}
+{$conversationContext}
+
+Customer's LATEST message:
+---
+{$message}
+---
+
+TASK: Determine what the customer wants to change about their booking.
+
+Return a JSON object with ONLY the fields that should be changed:
+- booking_date: "YYYY-MM-DD" format (only if customer wants to change date)
+- booking_time: "HH:mm:00" 24-hour format (only if customer wants to change time)
+- pax: number (only if customer wants to change number of guests)
+- has_changes: boolean - true if any changes are requested
+
+Examples:
+- "tukar ke khamis 25th" → {"booking_date": "2024-12-25", "has_changes": true}
+- "change to 7pm" → {"booking_time": "19:00:00", "has_changes": true}
+- "add 2 more people" (current is 4) → {"pax": 6, "has_changes": true}
+- "reschedule please" (no specific details) → {"has_changes": false}
+
+IMPORTANT:
+- Understand Malay: esok=tomorrow, minggu depan=next week, isnin/selasa/rabu/khamis/jumaat/sabtu/ahad = Mon-Sun
+- Understand Chinese: 明天=tomorrow, 下周=next week
+- Return ONLY valid JSON, no explanation
+PROMPT;
+
+        try {
+            $response = $this->openAI->chat([
+                ['role' => 'user', 'content' => $prompt]
+            ]);
+
+            // Clean response
+            $response = preg_replace('/```json\s*/', '', $response);
+            $response = preg_replace('/```\s*/', '', $response);
+            $response = trim($response);
+
+            $parsed = json_decode($response, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::warning('Failed to parse AI booking changes as JSON', [
+                    'response' => $response,
+                    'error' => json_last_error_msg(),
+                ]);
+                return null;
+            }
+
+            Log::info('AI parsed booking changes', [
+                'message' => $message,
+                'parsed' => $parsed,
+            ]);
+
+            // Return null if no changes
+            if (!($parsed['has_changes'] ?? false)) {
+                return null;
+            }
+
+            // Remove has_changes flag from return value
+            unset($parsed['has_changes']);
+            return empty($parsed) ? null : $parsed;
+
+        } catch (Exception $e) {
+            Log::error('Failed to parse booking changes with AI', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Check if a message looks like a booking attempt.
+     * This is a quick heuristic check - the AI intent detection is the primary method.
+     * We use this as a fast pre-filter to catch obvious booking form submissions.
+     */
+    public function isBookingAttempt(string $message): bool
+    {
+        // Count how many booking-related data points are present
+        $score = 0;
+
+        // Has pax/guests mentioned
+        if (preg_match('/\b\d+\s*(pax|guests?|people|persons?|orang|tetamu|位)/i', $message)) {
+            $score += 2;
+        }
+
+        // Has date pattern (various formats)
+        if (preg_match('/\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\b(tomorrow|esok|minggu depan|next\s+\w+day)/i', $message)) {
+            $score += 2;
+        }
+
+        // Has time pattern
+        if (preg_match('/\d{1,2}(:\d{2})?\s*(am|pm|pagi|petang|malam)/i', $message)) {
+            $score += 1;
+        }
+
+        // Has name/phone indicators
+        if (preg_match('/\b(name|nama|phone|telefon|contact)\s*[:=]/i', $message)) {
+            $score += 1;
+        }
+
+        // Looks like a filled form (multiple lines with data)
+        if (substr_count($message, "\n") >= 2) {
+            $score += 1;
+        }
+
+        // Require at least 3 points to be considered a booking attempt
+        return $score >= 3;
     }
 
     /**
@@ -244,7 +379,8 @@ PROMPT;
         $settings = RestaurantSetting::getInstance();
         $bookingDate = Carbon::parse($date);
         $bookingTime = Carbon::parse($time);
-        $endTime = $bookingTime->copy()->addMinutes($settings->slot_duration_minutes);
+        $slotDuration = $settings?->slot_duration_minutes ?? 60;
+        $endTime = $bookingTime->copy()->addMinutes($slotDuration);
 
         // Create full datetime for comparison
         $bookingDateTime = Carbon::parse($date . ' ' . $time);
@@ -269,17 +405,22 @@ PROMPT;
         }
 
         // Check if time is within operating hours
-        $opening = Carbon::parse($settings->opening_time);
-        $closing = Carbon::parse($settings->closing_time);
+        // Only check START time - allow bookings that start before closing even if slot extends past
+        $openingTimeStr = $settings?->opening_time ?? '10:00:00';
+        $closingTimeStr = $settings?->closing_time ?? '22:00:00';
+        $opening = Carbon::parse($openingTimeStr);
+        $closing = Carbon::parse($closingTimeStr);
 
         if (
             $bookingTime->format('H:i:s') < $opening->format('H:i:s') ||
-            $endTime->format('H:i:s') > $closing->format('H:i:s')
+            $bookingTime->format('H:i:s') > $closing->format('H:i:s')
         ) {
+            $formattedOpening = $settings?->formatted_opening_time ?? '10:00 AM';
+            $formattedClosing = $settings?->formatted_closing_time ?? '10:00 PM';
             return [
                 'available' => false,
                 'tables' => collect(),
-                'message' => "Sorry, we are only open from {$settings->formatted_opening_time} to {$settings->formatted_closing_time}. Please choose a time within our business hours.",
+                'message' => "Sorry, we are only open from {$formattedOpening} to {$formattedClosing}. Please choose a time within our business hours.",
             ];
         }
 
@@ -333,7 +474,8 @@ PROMPT;
     {
         $settings = RestaurantSetting::getInstance();
         $bookingTime = Carbon::parse($data['booking_time']);
-        $endTime = $bookingTime->copy()->addMinutes($settings->slot_duration_minutes);
+        $slotDuration = $settings?->slot_duration_minutes ?? 60;
+        $endTime = $bookingTime->copy()->addMinutes($slotDuration);
 
         // Find the best available table
         $availability = $this->checkAvailability(
@@ -349,7 +491,15 @@ PROMPT;
         // Use the smallest available table
         $table = $availability['tables']->first();
 
+        // Get merchant user_id - from data or from first merchant
+        $userId = $data['user_id'] ?? null;
+        if (!$userId) {
+            $merchant = User::where('role', User::ROLE_MERCHANT)->first();
+            $userId = $merchant?->id;
+        }
+
         $booking = Booking::create([
+            'user_id' => $userId,
             'conversation_id' => $data['conversation_id'] ?? null,
             'table_id' => $table->id,
             'customer_name' => $data['customer_name'],
@@ -395,7 +545,8 @@ PROMPT;
             if (!$availability['available']) {
                 // Also check if same table is available
                 $bookingTime = Carbon::parse($time);
-                $endTime = $bookingTime->copy()->addMinutes($settings->slot_duration_minutes);
+                $slotMinutes = $settings?->slot_duration_minutes ?? 60;
+                $endTime = $bookingTime->copy()->addMinutes($slotMinutes);
 
                 $hasConflict = Booking::where('table_id', $booking->table_id)
                     ->where('id', '!=', $booking->id)
@@ -421,7 +572,8 @@ PROMPT;
             // Update end time if time changed
             if (isset($data['booking_time'])) {
                 $bookingTime = Carbon::parse($data['booking_time']);
-                $data['end_time'] = $bookingTime->addMinutes($settings->slot_duration_minutes)->format('H:i:s');
+                $slotMinutes = $settings?->slot_duration_minutes ?? 60;
+                $data['end_time'] = $bookingTime->addMinutes($slotMinutes)->format('H:i:s');
             }
         }
 
@@ -512,8 +664,11 @@ PROMPT;
      */
     public function getUpcomingReminders(): Collection
     {
-        $settings = RestaurantSetting::getInstance();
-        $reminderTime = now()->addHours($settings->reminder_hours_before);
+        // Get reminder_hours_before from MerchantSetting
+        $merchant = User::where('role', User::ROLE_MERCHANT)->first();
+        $merchantSettings = $merchant ? MerchantSetting::where('user_id', $merchant->id)->first() : null;
+        $reminderHours = $merchantSettings?->reminder_hours_before ?? 24;
+        $reminderTime = now()->addHours($reminderHours);
 
         return Booking::needsReminder()
             ->whereDate('booking_date', $reminderTime->toDateString())
@@ -525,23 +680,39 @@ PROMPT;
 
     /**
      * Format booking confirmation message.
+     * Uses merchant's custom template or falls back to default.
      *
      * @param Booking $booking
      * @return string
      */
     public function formatConfirmationMessage(Booking $booking): string
     {
-        $settings = RestaurantSetting::getInstance();
-        $template = $settings->confirmation_template;
+        // Get merchant settings (conversation is linked to merchant)
+        $merchant = User::where('role', User::ROLE_MERCHANT)->first();
+        $merchantSettings = $merchant?->merchantSettings;
+
+        // Use custom template or default
+        $template = $merchantSettings?->confirmation_template;
+
+        if (empty($template)) {
+            // Default confirmation template
+            $template = "✅ *Booking Confirmed!*\n\n" .
+                "📅 Date: {date}\n" .
+                "🕐 Time: {time}\n" .
+                "👥 Guests: {pax}\n" .
+                "🪑 Table: {table}\n\n" .
+                "We look forward to seeing you, {name}!";
+        }
 
         return str_replace(
-            ['{name}', '{date}', '{time}', '{pax}', '{table}'],
+            ['{name}', '{date}', '{time}', '{pax}', '{table}', '{phone}'],
             [
                 $booking->customer_name,
                 $booking->booking_date->format('l, F j, Y'),
                 Carbon::parse($booking->booking_time)->format('g:i A'),
                 $booking->pax,
-                $booking->table->name,
+                $booking->table->name ?? 'TBA',
+                $booking->customer_phone,
             ],
             $template
         );
@@ -549,23 +720,40 @@ PROMPT;
 
     /**
      * Format booking reminder message.
+     * Uses merchant's custom template or falls back to default.
      *
      * @param Booking $booking
      * @return string
      */
     public function formatReminderMessage(Booking $booking): string
     {
-        $settings = RestaurantSetting::getInstance();
-        $template = $settings->reminder_template;
+        // Get merchant settings
+        $merchant = User::where('role', User::ROLE_MERCHANT)->first();
+        $merchantSettings = $merchant?->merchantSettings;
+
+        // Use custom template or default
+        $template = $merchantSettings?->reminder_template;
+
+        if (empty($template)) {
+            // Default reminder template
+            $template = "👋 Hi {name}! 👋\n\n" .
+                "This is a reminder about your booking tomorrow:\n\n" .
+                "📅 Date: {date}\n" .
+                "🕐 Time: {time}\n" .
+                "👥 Guests: {pax}\n" .
+
+                "See you soon!";
+        }
 
         return str_replace(
-            ['{name}', '{date}', '{time}', '{pax}', '{table}'],
+            ['{name}', '{date}', '{time}', '{pax}', '{table}', '{phone}'],
             [
                 $booking->customer_name,
                 $booking->booking_date->format('l, F j, Y'),
                 Carbon::parse($booking->booking_time)->format('g:i A'),
                 $booking->pax,
-                $booking->table->name,
+                $booking->table->name ?? 'TBA',
+                $booking->customer_phone,
             ],
             $template
         );
@@ -600,9 +788,12 @@ PROMPT;
         $settings = RestaurantSetting::getInstance();
         $alternatives = collect();
 
-        $opening = Carbon::parse($settings->opening_time);
-        $closing = Carbon::parse($settings->closing_time);
-        $slotDuration = $settings->slot_duration_minutes;
+        $openingTime = $settings?->opening_time ?? '10:00';
+        $closingTime = $settings?->closing_time ?? '22:00';
+        $slotDuration = $settings?->slot_duration_minutes ?? 60;
+
+        $opening = Carbon::parse($openingTime);
+        $closing = Carbon::parse($closingTime);
 
         $currentTime = $opening->copy();
 

@@ -1,0 +1,529 @@
+================================================================================
+                    RESTORAN SELERA KAMPUNG
+                   KITCHEN OPERATIONS GUIDE
+================================================================================
+
+                    "Masakan Kampung, Rasa Sejati"
+                   (Village Cooking, Authentic Taste)
+
+                        Established 2010
+              123 Jalan Maju, Taman Harmoni, Subang Jaya
+
+================================================================================
+                        TABLE OF CONTENTS
+================================================================================
+
+1. Kitchen Organization & Stations
+2. Daily Opening Procedures
+3. Prep Lists & Mise en Place
+4. Recipe Standards - Signature Dishes
+5. Cooking Methods & Techniques
+6. Plating & Presentation Standards
+7. Food Storage Guidelines
+8. Daily Closing Procedures
+9. Equipment Maintenance
+10. Emergency Procedures
+
+================================================================================
+1. KITCHEN ORGANIZATION & STATIONS
+================================================================================
+
+STATION LAYOUT:
+---------------
+Our kitchen is organized into the following stations:
+
+[HOT STATION - "Dapur Panas"]
+- Wok cooking (nasi goreng, mee goreng, char kuey teow)
+- Grilling (ayam percik, ikan bakar)
+- Deep frying (ayam goreng, pisang goreng)
+- Responsible Chef: Senior Cook
+
+[RICE STATION - "Stesen Nasi"]
+- Nasi lemak preparation
+- Rice cooking (white rice, coconut rice)
+- Rice portioning and plating
+- Responsible Chef: Rice Cook
+
+[CURRY STATION - "Stesen Kari"]
+- Rendang preparation
+- Curry cooking
+- Sambal preparation
+- Responsible Chef: Curry Specialist
+
+[PREP STATION - "Stesen Sedia"]
+- Vegetable cutting and preparation
+- Meat portioning
+- Sauce preparation
+- Responsible Chef: Prep Cook
+
+[BEVERAGE STATION - "Stesen Minuman"]
+- Hot drinks (teh tarik, kopi)
+- Cold drinks (air sirap, fresh coconut)
+- Desserts (cendol, ABC)
+- Responsible Staff: Beverage Maker
+
+================================================================================
+2. DAILY OPENING PROCEDURES
+================================================================================
+
+MORNING SHIFT - Start Time: 9:00 AM (2 hours before opening)
+
+9:00 AM - ARRIVAL & SETUP
+---------------------------
+[ ] Clock in and change into clean uniform
+[ ] Wash hands thoroughly (20 seconds minimum)
+[ ] Check refrigerator temperatures (must be below 4°C)
+[ ] Check freezer temperatures (must be below -18°C)
+[ ] Turn on all equipment (allow 30 min warm-up)
+
+9:15 AM - INVENTORY CHECK
+--------------------------
+[ ] Check fresh ingredients delivery
+[ ] Verify meat and fish freshness
+[ ] Check vegetable quality
+[ ] Report any shortages to supervisor
+[ ] Move items from freezer to fridge for thawing (if needed)
+
+9:30 AM - PREP WORK
+--------------------
+[ ] Prepare sambal (fresh batch daily)
+[ ] Cook coconut rice for nasi lemak
+[ ] Portion meats for the day
+[ ] Cut vegetables (onions, chilies, tomatoes)
+[ ] Prepare garnishes
+[ ] Make fresh rempah (spice paste)
+
+10:15 AM - STATION SETUP
+-------------------------
+[ ] Set up individual cooking stations
+[ ] Check oil levels in fryers
+[ ] Prepare cooking utensils
+[ ] Set up garnish containers
+[ ] Check gas connections
+
+10:45 AM - FINAL CHECKS
+------------------------
+[ ] Taste test sambal and curries
+[ ] Check all equipment functioning
+[ ] Brief team on daily specials
+[ ] Review any special reservations
+[ ] READY FOR SERVICE at 11:00 AM
+
+================================================================================
+3. PREP LISTS & MISE EN PLACE
+================================================================================
+
+DAILY PREP QUANTITIES (Based on average daily customers: 150-200)
+
+PROTEINS:
+---------
+Item                    | Prep Amount    | Storage
+------------------------|----------------|------------------
+Chicken (whole)         | 15 kg          | Marinate in fridge
+Chicken (cut pieces)    | 10 kg          | Portion in trays
+Beef (rendang)          | 8 kg           | Cut into cubes
+Fish (ikan kembung)     | 5 kg           | Clean, score
+Prawns                  | 3 kg           | Peel, devein
+Anchovies (ikan bilis)  | 2 kg           | Clean, dry
+
+VEGETABLES:
+-----------
+Item                    | Prep Amount    | How to Prep
+------------------------|----------------|------------------
+Onions                  | 5 kg           | Slice thin, dice
+Garlic                  | 1 kg           | Mince
+Ginger                  | 500g           | Slice, julienne
+Chilies (red)           | 1 kg           | Slice, grind
+Chilies (green)         | 500g           | Slice diagonal
+Bean sprouts            | 3 kg           | Wash, drain
+Cucumber                | 2 kg           | Slice for garnish
+Tomatoes                | 2 kg           | Wedges, dice
+Kangkung (water spinach)| 2 kg           | Cut 2-inch pieces
+Long beans              | 1 kg           | Cut diagonal
+
+SAUCES & PASTES (Prep fresh daily):
+-----------------------------------
+Item                    | Quantity       | Notes
+------------------------|----------------|------------------
+Sambal tumis            | 2 kg           | Main sambal
+Sambal belacan          | 1 kg           | Side condiment
+Rempah rendang          | 1 kg           | For rendang
+Percik marinade         | 1 kg           | For ayam percik
+Kicap manis mix         | 500ml          | For noodles
+
+================================================================================
+4. RECIPE STANDARDS - SIGNATURE DISHES
+================================================================================
+
+NASI LEMAK SPECIAL (RM 12.00)
+-----------------------------
+Serving: 1 plate
+
+RICE COMPONENT:
+- Jasmine rice: 200g (cooked weight)
+- Coconut milk: 100ml
+- Pandan leaves: 2 pieces
+- Salt: 1/2 tsp
+- Method: Cook rice with coconut milk and pandan for fragrant texture
+
+SAMBAL:
+- Dried chilies: 50g (soaked, blended)
+- Shallots: 30g
+- Garlic: 10g
+- Belacan: 5g
+- Tamarind juice: 20ml
+- Sugar: 15g
+- Salt: to taste
+- Method: Tumis until oil separates, 20-25 minutes
+
+ACCOMPANIMENTS (per plate):
+- Fried chicken: 1 piece (150g)
+- Hard-boiled egg: 1/2 egg (sliced)
+- Fried anchovies: 20g
+- Roasted peanuts: 15g
+- Cucumber slices: 3 pieces
+
+PLATING: Rice in center, sambal on top, chicken to the side, egg and
+anchovies arranged around rice, cucumber as garnish.
+
+---
+
+RENDANG TOK (RM 18.00)
+----------------------
+Serving: 1 portion (200g meat + gravy)
+
+INGREDIENTS:
+- Beef (topside): 200g cubed
+- Coconut milk: 200ml
+- Kerisik (toasted coconut): 50g
+- Rempah rendang: 80g
+- Lemongrass: 2 stalks (bruised)
+- Galangal: 20g (sliced)
+- Turmeric leaves: 2 pieces
+- Kaffir lime leaves: 3 pieces
+- Salt: to taste
+- Sugar: 1 tsp
+
+METHOD:
+1. Toast coconut for kerisik until golden brown
+2. Sauté rempah with oil until fragrant (10 min)
+3. Add beef, coat well with rempah
+4. Pour coconut milk, add lemongrass, galangal
+5. Simmer on low heat for 3-4 hours
+6. Add kerisik in last 30 minutes
+7. Stir continuously until dry and caramelized
+8. Add turmeric and lime leaves at the end
+
+QUALITY CHECK: Meat should be tender, gravy thick and dark, oil separated.
+
+---
+
+AYAM PERCIK (RM 15.00)
+----------------------
+Serving: 1 portion (1/4 chicken)
+
+MARINADE:
+- Chicken: 300g (1/4 bird)
+- Turmeric powder: 1 tsp
+- Salt: 1/2 tsp
+- Marinating time: Minimum 2 hours
+
+PERCIK SAUCE:
+- Coconut milk: 150ml
+- Dried chilies: 30g (soaked, blended)
+- Shallots: 50g
+- Garlic: 20g
+- Ginger: 15g
+- Lemongrass: 1 stalk
+- Galangal: 10g
+- Turmeric: 1/2 tsp
+- Sugar: 1 tbsp
+- Salt: to taste
+
+METHOD:
+1. Marinate chicken with turmeric and salt
+2. Grill chicken until 70% cooked
+3. Prepare percik sauce - blend and cook until fragrant
+4. Baste chicken generously with sauce
+5. Continue grilling, basting every 2-3 minutes
+6. Total grilling time: 25-30 minutes
+7. Char marks should be visible
+
+PLATING: Serve on banana leaf with extra sauce on the side.
+
+================================================================================
+5. COOKING METHODS & TECHNIQUES
+================================================================================
+
+TUMIS (Sautéing Malaysian Style)
+--------------------------------
+- Start with cold oil in hot wok
+- Add aromatics (bawang, halia) first
+- Add sambal/rempah, cook until oil separates
+- "Pecah minyak" = oil separated = flavor developed
+- Never rush this step - minimum 10-15 minutes
+
+WOK HEY (Wok Breath)
+--------------------
+- Essential for: Char kuey teow, nasi goreng, mee goreng
+- Wok must be smoking hot before adding ingredients
+- Small batches only (max 1 portion at a time)
+- Quick tossing action
+- Total cooking time: 2-3 minutes max
+
+GRILLING (Panggang)
+-------------------
+- Charcoal preferred for authentic flavor
+- Maintain medium-high heat
+- Baste frequently to prevent drying
+- Internal temperature for chicken: 75°C
+- Rest meat 2-3 minutes before serving
+
+DEEP FRYING (Goreng)
+--------------------
+- Oil temperature: 170-180°C
+- Never overcrowd the fryer
+- Chicken pieces: 8-10 minutes depending on size
+- Drain on rack, not paper towels
+- Oil change: Every 3 days or when darkened
+
+STEAMING (Kukus)
+----------------
+- Water must be boiling before placing food
+- Don't lift lid during cooking
+- Fish: 8-10 minutes per 500g
+- Check doneness with fork/chopstick
+
+================================================================================
+6. PLATING & PRESENTATION STANDARDS
+================================================================================
+
+GENERAL PRINCIPLES:
+-------------------
+- Clean plate edges before serving
+- Garnish appropriately (don't over-garnish)
+- Serve hot food hot, cold food cold
+- Check every plate before it leaves the kitchen
+
+GARNISHING GUIDE:
+-----------------
+Dish              | Garnish
+------------------|------------------------------------------
+Nasi Lemak        | Cucumber, fried shallots
+Nasi Goreng       | Fried egg, cucumber, tomato wedge
+Mee Goreng        | Lime wedge, fried shallots, green onion
+Rendang           | Kerisik sprinkle, kaffir lime leaf
+Ayam Percik       | Fresh cilantro, lime wedge
+Ikan Bakar        | Lime, ulam (raw vegetables)
+Curry dishes      | Fresh curry leaves, red chili slices
+
+PORTION CONTROL:
+----------------
+Item              | Standard Portion
+------------------|------------------
+Rice              | 200g cooked
+Noodles           | 180g cooked
+Meat (main)       | 150-200g
+Fish              | 200-250g
+Vegetables        | 100g
+Gravy/Sambal      | 50-80ml
+
+================================================================================
+7. FOOD STORAGE GUIDELINES
+================================================================================
+
+REFRIGERATOR ORGANIZATION (4°C or below):
+-----------------------------------------
+TOP SHELF:     Ready-to-eat foods, cooked items
+MIDDLE SHELF:  Dairy, eggs, prepared ingredients
+BOTTOM SHELF:  Raw meat and fish (in sealed containers)
+DRAWERS:       Vegetables and fruits
+
+FREEZER ORGANIZATION (-18°C or below):
+--------------------------------------
+- Raw proteins in sealed bags with date labels
+- Maximum storage: Chicken 3 months, Beef 6 months, Fish 2 months
+- Never refreeze thawed items
+
+LABELING SYSTEM:
+----------------
+All items must have labels with:
+- Item name
+- Date prepared/received
+- Use by date
+- Staff initials
+
+FIFO - FIRST IN, FIRST OUT:
+---------------------------
+Always use older stock first. New deliveries go to the back.
+
+DRY STORAGE:
+------------
+- Temperature: Below 25°C, low humidity
+- Off the floor (minimum 15cm)
+- Away from walls (minimum 5cm)
+- Check expiry dates weekly
+
+================================================================================
+8. DAILY CLOSING PROCEDURES
+================================================================================
+
+CLOSING SHIFT - Start: 30 minutes before close
+
+KITCHEN BREAKDOWN:
+------------------
+[ ] Turn off all cooking equipment
+[ ] Clean grills and wok stations
+[ ] Empty and clean deep fryers (if scheduled)
+[ ] Wipe down all surfaces with sanitizer
+[ ] Clean and organize prep stations
+
+FOOD STORAGE:
+-------------
+[ ] Store leftover prep items properly
+[ ] Label all containers with date
+[ ] Discard any items past use-by date
+[ ] Cover all stored food
+[ ] Check fridge/freezer temperatures, log readings
+
+CLEANING:
+---------
+[ ] Sweep and mop all floors
+[ ] Clean floor drains
+[ ] Empty all trash bins
+[ ] Sanitize cutting boards
+[ ] Clean and sanitize sinks
+[ ] Wipe down equipment exteriors
+
+EQUIPMENT:
+----------
+[ ] Turn off gas supply at main valve
+[ ] Ensure all electrical equipment is off
+[ ] Check that exhaust fans are off
+[ ] Lock all storage areas
+
+FINAL CHECKS:
+-------------
+[ ] Complete closing checklist
+[ ] Report any equipment issues
+[ ] Brief morning shift on any notes
+[ ] Secure all entry points
+[ ] Set alarm system
+
+================================================================================
+9. EQUIPMENT MAINTENANCE
+================================================================================
+
+DAILY MAINTENANCE:
+------------------
+- Wipe down all equipment after each use
+- Clean grease traps
+- Check pilot lights on gas equipment
+- Report any unusual sounds or smells
+
+WEEKLY MAINTENANCE:
+-------------------
+- Deep clean exhaust hoods
+- Clean refrigerator coils
+- Sharpen knives
+- Check gas connections
+- Calibrate thermometers
+
+MONTHLY MAINTENANCE:
+--------------------
+- Professional hood cleaning
+- Deep clean fryers
+- Equipment inspection by technician
+- Fire extinguisher check
+
+EQUIPMENT ISSUES - REPORT TO:
+-----------------------------
+Minor issues: Shift supervisor
+Major issues: Restaurant manager
+Emergency: Contact maintenance hotline
+
+================================================================================
+10. EMERGENCY PROCEDURES
+================================================================================
+
+FIRE:
+-----
+1. Shout "FIRE!" to alert others
+2. Turn off gas at main valve
+3. If small fire: Use fire extinguisher (PASS method)
+   - Pull pin
+   - Aim at base of fire
+   - Squeeze handle
+   - Sweep side to side
+4. If large fire: Evacuate immediately
+5. Call 999
+6. Meet at assembly point (front parking lot)
+7. Do not re-enter building
+
+GAS LEAK:
+---------
+1. Do not operate any switches or create sparks
+2. Turn off gas at main valve (if safe)
+3. Open all windows and doors
+4. Evacuate the area
+5. Call gas emergency hotline
+6. Do not re-enter until cleared
+
+INJURY/ACCIDENT:
+----------------
+1. Administer first aid if trained
+2. Call for supervisor
+3. For serious injury: Call 999
+4. Do not move injured person unless necessary
+5. Complete incident report
+
+POWER OUTAGE:
+-------------
+1. Remain calm
+2. Turn off all electrical equipment
+3. Check refrigerator/freezer - keep doors closed
+4. If extended outage: Follow food safety protocol for temp control
+5. Use backup lighting if available
+
+================================================================================
+                         IMPORTANT CONTACTS
+================================================================================
+
+Restaurant Manager:        [Name] - +60 12-XXX XXXX
+Kitchen Supervisor:        [Name] - +60 12-XXX XXXX
+Maintenance:              +60 3-XXXX XXXX
+Gas Emergency:            1-800-88-8800
+Fire/Ambulance:           999
+Police:                   999
+
+================================================================================
+                    ACKNOWLEDGMENT
+================================================================================
+
+I have read and understood the Kitchen Operations Guide for
+Restoran Selera Kampung. I agree to follow all procedures and
+guidelines outlined in this document.
+
+Employee Name: _______________________________
+
+Position: _______________________________
+
+Signature: _______________________________
+
+Date: _______________________________
+
+Supervisor: _______________________________
+
+================================================================================
+              RESTORAN SELERA KAMPUNG
+            "Masakan Kampung, Rasa Sejati"
+
+         123 Jalan Maju, Taman Harmoni
+             47500 Subang Jaya
+
+            Phone: +60 3-1234 5678
+          WhatsApp: +60 12-345 6789
+
+              Document Version: 2.0
+          Effective Date: January 2024
+================================================================================

@@ -43,19 +43,4 @@ interface BusinessHandlerInterface
      * @return bool
      */
     public function handleContextualResponse(Conversation $conversation, string $content, array $context): bool;
-
-    /**
-     * Get keywords that indicate intent for this business type.
-     *
-     * @return array
-     */
-    public function getIntentKeywords(): array;
-
-    /**
-     * Check if the content looks like it has business-specific intent.
-     *
-     * @param string $content
-     * @return bool
-     */
-    public function looksLikeBusinessIntent(string $content): bool;
 }

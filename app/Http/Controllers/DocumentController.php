@@ -58,7 +58,7 @@ class DocumentController extends Controller
         // Dispatch async processing job
         ProcessDocumentJob::dispatch($document);
 
-        return back()->with('success', 'Document uploaded! Processing will begin shortly.');
+        return back()->with('success', 'Document uploaded!');
     }
 
     /**

@@ -37,6 +37,7 @@ class MerchantSettingsController extends Controller
                 'business_name' => $merchantSetting->business_name,
                 'greeting_message' => $merchantSetting->greeting_message,
                 'ai_tone' => $merchantSetting->ai_tone,
+                'booking_form_template' => $merchantSetting->booking_form_template,
                 'confirmation_template' => $merchantSetting->confirmation_template,
                 'reminder_template' => $merchantSetting->reminder_template,
                 'reminder_hours_before' => $merchantSetting->reminder_hours_before,
@@ -99,6 +100,7 @@ class MerchantSettingsController extends Controller
             'business_name' => 'required|string|max:255',
             'greeting_message' => 'nullable|string|max:2000',
             'ai_tone' => 'nullable|string|max:2000',
+            'booking_form_template' => 'nullable|string|max:2000',
             'confirmation_template' => 'nullable|string|max:2000',
             'reminder_template' => 'nullable|string|max:2000',
             'reminder_hours_before' => 'nullable|integer|min:1|max:168',
@@ -126,8 +128,8 @@ class MerchantSettingsController extends Controller
         }
 
         $validated = $request->validate([
-            'opening_time' => 'required|date_format:H:i',
-            'closing_time' => 'required|date_format:H:i',
+            'opening_time' => 'required|date_format:H:i,H:i:s',
+            'closing_time' => 'required|date_format:H:i,H:i:s',
             'slot_duration_minutes' => 'required|integer|min:15|max:480',
         ]);
 
