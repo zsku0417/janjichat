@@ -26,8 +26,13 @@ const demoAccounts = [
         password: "password",
     },
     {
-        label: "🍽️ Merchant",
-        email: "merchant@example.com",
+        label: "🍽️ Restaurant",
+        email: "restaurant@example.com",
+        password: "password",
+    },
+    {
+        label: "🏦 Shop",
+        email: "shop@example.com",
         password: "password",
     },
 ];

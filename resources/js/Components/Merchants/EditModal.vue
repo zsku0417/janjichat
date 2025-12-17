@@ -167,25 +167,21 @@ const submit = () => {
                                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                             >
                                 Business Type
-                                <span class="text-red-500">*</span>
                             </label>
-                            <select
-                                v-model="form.business_type"
-                                class="w-full px-4 py-2.5 rounded-xl border-0 bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-slate-600 focus:ring-2 focus:ring-primary-500"
+                            <div
+                                class="w-full px-4 py-2.5 rounded-xl border-0 bg-gray-100 dark:bg-slate-600 text-gray-700 dark:text-gray-300 shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-slate-500 cursor-not-allowed"
                             >
-                                <option
-                                    v-for="(label, value) in businessTypes"
-                                    :key="value"
-                                    :value="value"
-                                >
-                                    {{ label }}
-                                </option>
-                            </select>
+                                {{
+                                    businessTypes[merchant?.business_type] ||
+                                    merchant?.business_type
+                                }}
+                            </div>
                             <p
-                                class="mt-1 text-xs text-yellow-600 dark:text-yellow-400"
+                                class="mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-lg"
                             >
-                                ⚠️ Changing business type will clear all
-                                merchant data
+                                🔒 Business type cannot be changed. To change
+                                it, please delete this merchant and create a new
+                                one.
                             </p>
                         </div>
                     </div>

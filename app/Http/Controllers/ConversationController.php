@@ -24,11 +24,18 @@ class ConversationController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = auth()->user();
+
         $query = Conversation::with([
             'messages' => function ($query) {
                 $query->orderBy('created_at', 'desc');
             }
         ]);
+
+        // Multi-tenant: Merchants see only their conversations
+        if ($user->isMerchant()) {
+            $query->where('user_id', $user->id);
+        }
 
         // Filter by status
         if ($request->has('filter')) {

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Carbon\Carbon;
 
@@ -12,6 +13,7 @@ class Conversation extends Model
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'whatsapp_id',
         'phone_number',
         'customer_name',
@@ -43,6 +45,23 @@ class Conversation extends Model
     const CONTEXT_AWAITING_ORDER_CONFIRMATION = 'awaiting_order_confirmation';
 
     /**
+     * Get the merchant (user) who owns this conversation.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the merchant (user) who owns this conversation.
+     * Alias for user() for backward compatibility.
+     */
+    public function getMerchantAttribute(): ?User
+    {
+        return $this->user;
+    }
+
+    /**
      * Get all messages in this conversation.
      */
     public function messages(): HasMany
@@ -64,18 +83,6 @@ class Conversation extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
-    }
-
-    /**
-     * Get the merchant (user) who owns this conversation.
-     * This is an accessor, not a relationship.
-     * In a multi-tenant setup, this would be a proper belongsTo relationship.
-     */
-    public function getMerchantAttribute(): ?User
-    {
-        // For now, return the first merchant user
-        // TODO: In true multi-tenant, add user_id to conversations table and use belongsTo
-        return User::where('role', User::ROLE_MERCHANT)->first();
     }
 
     /**
@@ -115,8 +122,8 @@ class Conversation extends Model
     protected function sendEscalationEmail(string $reason): void
     {
         try {
-            // Get merchant for this conversation
-            $merchant = User::where('role', User::ROLE_MERCHANT)->first();
+            // Get merchant for this conversation using proper relationship
+            $merchant = $this->user;
             if (!$merchant) {
                 return;
             }
@@ -140,6 +147,7 @@ class Conversation extends Model
 
             \Illuminate\Support\Facades\Log::info('Escalation email sent', [
                 'conversation_id' => $this->id,
+                'merchant_id' => $merchant->id,
                 'recipient' => $recipientEmail,
                 'reason' => $reason,
             ]);

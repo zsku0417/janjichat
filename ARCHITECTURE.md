@@ -57,16 +57,17 @@ erDiagram
 
 ### Conversation
 
-| Field             | Type    | Description                  |
-| ----------------- | ------- | ---------------------------- |
-| whatsapp_id       | string  | WhatsApp conversation ID     |
-| phone_number      | string  | Customer phone number        |
-| customer_name     | string  | Customer name                |
-| mode              | string  | `ai` or `admin`              |
-| needs_reply       | boolean | Escalation flag              |
-| escalation_reason | string  | Why escalated                |
-| context_type      | string  | Current conversation context |
-| context_data      | json    | Context-specific data        |
+| Field             | Type    | Description                         |
+| ----------------- | ------- | ----------------------------------- |
+| user_id           | FK      | Merchant who owns this conversation |
+| whatsapp_id       | string  | WhatsApp conversation ID            |
+| phone_number      | string  | Customer phone number               |
+| customer_name     | string  | Customer name                       |
+| mode              | string  | `ai` or `admin`                     |
+| needs_reply       | boolean | Escalation flag                     |
+| escalation_reason | string  | Why escalated                       |
+| context_type      | string  | Current conversation context        |
+| context_data      | json    | Context-specific data               |
 
 **Context Types:**
 
@@ -79,6 +80,7 @@ erDiagram
 
 **Relationships:**
 
+-   `belongsTo` → User (merchant)
 -   `hasMany` → Message, Booking, Order
 
 ---
@@ -316,6 +318,46 @@ chat($messages, $model = 'gpt-4o-mini')
                                                │ WhatsAppService│
                                                │ (Send Reply)  │
                                                └───────────────┘
+```
+
+---
+
+## Multi-Tenant System
+
+The system supports multiple merchants, each with their own WhatsApp number and conversations.
+
+### How It Works:
+
+```
+Customer → WhatsApp → Webhook (phone_number_id: 123)
+                          ↓
+                    Find merchant where whatsapp_phone_number_id = 123
+                          ↓
+                    Create/update conversation with user_id = merchant.id
+                          ↓
+                    Merchant sees only their own conversations
+```
+
+### Key Points:
+
+1. **Webhook Detection** - `phone_number_id` in webhook payload identifies which merchant's WhatsApp received the message
+2. **Conversation Linking** - Each conversation has `user_id` foreign key to the merchant
+3. **Access Control** - Merchants only see conversations where `user_id` matches their ID
+4. **Backward Compatibility** - Old conversations without `user_id` are automatically updated when new messages arrive
+
+### Code Flow:
+
+```php
+// In ConversationHandler::getOrCreateConversation()
+$merchant = User::where('whatsapp_phone_number_id', $phoneNumberId)->first();
+$conversation = Conversation::where('whatsapp_id', $customerPhone)
+    ->where('user_id', $merchant->id)
+    ->first();
+
+// In ConversationController::index()
+if ($user->isMerchant()) {
+    $query->where('user_id', $user->id);
+}
 ```
 
 ---

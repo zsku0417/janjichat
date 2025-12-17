@@ -113,7 +113,7 @@ const submit = () => {
                     <!-- Note about images -->
                     <div class="p-4 bg-blue-50 border border-blue-200 rounded-xl">
                         <p class="text-sm text-blue-700">
-                            📷 <strong>Product images</strong> - Image upload (S3) will be available in the next update!
+                            📷 <strong>Product images</strong> - Image upload (will be available in the next update!)
                         </p>
                     </div>
 

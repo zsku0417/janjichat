@@ -141,6 +141,7 @@ class AdminMerchantController extends Controller
 
     /**
      * Update a merchant.
+     * Note: business_type cannot be changed - must delete and recreate merchant.
      */
     public function update(Request $request, User $merchant): RedirectResponse
     {
@@ -152,18 +153,13 @@ class AdminMerchantController extends Controller
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('users')->ignore($merchant->id)],
             'password' => 'nullable|string|min:8',
-            'business_type' => ['required', Rule::in(array_keys(User::getBusinessTypes()))],
             'whatsapp_phone_number_id' => 'required|string',
             'whatsapp_access_token' => 'nullable|string',
         ]);
 
-        // Check if business type is changing
-        $businessTypeChanged = $merchant->business_type !== $validated['business_type'];
-
-        // Update basic info
+        // Update basic info (business_type is NOT editable)
         $merchant->name = $validated['name'];
         $merchant->email = $validated['email'];
-        $merchant->business_type = $validated['business_type'];
         $merchant->whatsapp_phone_number_id = $validated['whatsapp_phone_number_id'];
 
         if (!empty($validated['password'])) {
@@ -175,17 +171,6 @@ class AdminMerchantController extends Controller
         }
 
         $merchant->save();
-
-        // If business type changed, clear all related data
-        if ($businessTypeChanged) {
-            $this->clearMerchantData($merchant);
-            Log::info('Merchant business type changed, data cleared', [
-                'merchant_id' => $merchant->id,
-                'new_type' => $validated['business_type'],
-            ]);
-
-            return back()->with('success', 'Merchant updated. Data cleared due to business type change.');
-        }
 
         return back()->with('success', 'Merchant updated successfully.');
     }
@@ -263,6 +248,7 @@ class AdminMerchantController extends Controller
 
         // Delete bookings (for restaurant)
         Booking::whereIn('conversation_id', $conversationIds)->delete();
+        Booking::where('user_id', $merchant->id)->delete();
 
         // Delete orders and items (for order tracking)
         $orderIds = Order::where('user_id', $merchant->id)->pluck('id');
@@ -277,10 +263,22 @@ class AdminMerchantController extends Controller
         DocumentChunk::whereIn('document_id', $documentIds)->delete();
         Document::where('user_id', $merchant->id)->delete();
 
+        // Delete tables (for restaurant)
+        \App\Models\Table::where('user_id', $merchant->id)->delete();
+
+        // Delete products (for order tracking)
+        \App\Models\Product::where('user_id', $merchant->id)->delete();
+
+        // Delete settings
+        \App\Models\MerchantSetting::where('user_id', $merchant->id)->delete();
+        \App\Models\RestaurantSetting::where('user_id', $merchant->id)->delete();
+        \App\Models\OrderTrackingSetting::where('user_id', $merchant->id)->delete();
+
         Log::info('Merchant data cleared', [
             'merchant_id' => $merchant->id,
             'conversations_deleted' => $conversationIds->count(),
             'documents_deleted' => $documentIds->count(),
+            'orders_deleted' => $orderIds->count(),
         ]);
     }
 }

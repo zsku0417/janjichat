@@ -142,14 +142,35 @@ class ConversationHandler
     /**
      * Get existing conversation or create a new one.
      * Returns array with conversation and isNew flag.
+     * Now includes multi-tenant detection via phone_number_id.
      */
     protected function getOrCreateConversation(array $messageData): array
     {
-        $conversation = Conversation::where('whatsapp_id', $messageData['from'])->first();
+        // Find merchant by phone_number_id from webhook
+        $merchant = $this->findMerchantByPhoneNumberId($messageData['phone_number_id'] ?? null);
+
+        if (!$merchant) {
+            Log::warning('No merchant found for phone_number_id', [
+                'phone_number_id' => $messageData['phone_number_id'] ?? 'missing',
+            ]);
+            // Fall back to first merchant (backward compatibility)
+            $merchant = User::where('role', User::ROLE_MERCHANT)->first();
+        }
+
+        // Look for existing conversation for this customer + merchant
+        $conversation = Conversation::where('whatsapp_id', $messageData['from'])
+            ->where(function ($query) use ($merchant) {
+                // Match by user_id if set, or where user_id is null (old conversations)
+                $query->where('user_id', $merchant?->id)
+                    ->orWhereNull('user_id');
+            })
+            ->first();
+
         $isNew = false;
 
         if (!$conversation) {
             $conversation = Conversation::create([
+                'user_id' => $merchant?->id,
                 'whatsapp_id' => $messageData['from'],
                 'phone_number' => $messageData['from'],
                 'customer_name' => $messageData['contact_name'],
@@ -163,12 +184,38 @@ class ConversationHandler
             Log::info('New conversation created', [
                 'conversation_id' => $conversation->id,
                 'phone' => $messageData['from'],
+                'merchant_id' => $merchant?->id,
             ]);
-        } elseif ($messageData['contact_name'] && !$conversation->customer_name) {
-            $conversation->update(['customer_name' => $messageData['contact_name']]);
+        } else {
+            // Update user_id for old conversations that don't have it
+            if (!$conversation->user_id && $merchant) {
+                $conversation->update(['user_id' => $merchant->id]);
+                Log::info('Updated conversation with merchant user_id', [
+                    'conversation_id' => $conversation->id,
+                    'merchant_id' => $merchant->id,
+                ]);
+            }
+
+            if ($messageData['contact_name'] && !$conversation->customer_name) {
+                $conversation->update(['customer_name' => $messageData['contact_name']]);
+            }
         }
 
         return ['conversation' => $conversation, 'isNew' => $isNew];
+    }
+
+    /**
+     * Find merchant by WhatsApp phone number ID.
+     */
+    protected function findMerchantByPhoneNumberId(?string $phoneNumberId): ?User
+    {
+        if (!$phoneNumberId) {
+            return null;
+        }
+
+        return User::where('role', User::ROLE_MERCHANT)
+            ->where('whatsapp_phone_number_id', $phoneNumberId)
+            ->first();
     }
 
     /**

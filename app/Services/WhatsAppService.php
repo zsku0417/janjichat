@@ -166,11 +166,18 @@ class WhatsAppService
                 return null;
             }
 
+            // Extract the phone_number_id from metadata (identifies which merchant's WhatsApp)
+            $phoneNumberId = $value['metadata']['phone_number_id'] ?? null;
+
             // Check for messages
             $messages = $value['messages'] ?? null;
             if (!$messages || empty($messages)) {
                 // This might be a status update
-                return $this->parseStatusUpdate($value);
+                $statusData = $this->parseStatusUpdate($value);
+                if ($statusData) {
+                    $statusData['phone_number_id'] = $phoneNumberId;
+                }
+                return $statusData;
             }
 
             $message = $messages[0];
@@ -185,6 +192,7 @@ class WhatsAppService
                 'content' => $this->extractMessageContent($message),
                 'contact_name' => $contact['profile']['name'] ?? null,
                 'metadata' => $this->extractMetadata($message),
+                'phone_number_id' => $phoneNumberId, // Add this for multi-tenant detection
             ];
 
         } catch (Exception $e) {

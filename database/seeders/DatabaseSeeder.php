@@ -16,8 +16,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             UsersSeeder::class,
-            RestaurantSeeder::class,
-            // OrderTrackingSeeder::class, // Uncomment when merchant switches to order tracking
         ]);
     }
 }
