@@ -13,14 +13,15 @@ class Document extends Model
 
     protected $fillable = [
         'user_id',
-        'filename',
+        'media_id',
         'original_name',
-        'file_path',
-        'file_type',
-        'file_size',
         'status',
         'chunks_count',
         'error_message',
+    ];
+
+    protected $casts = [
+        'chunks_count' => 'integer',
     ];
 
     /**
@@ -31,10 +32,13 @@ class Document extends Model
         return $this->belongsTo(User::class);
     }
 
-    protected $casts = [
-        'file_size' => 'integer',
-        'chunks_count' => 'integer',
-    ];
+    /**
+     * Get the media file for this document.
+     */
+    public function media(): BelongsTo
+    {
+        return $this->belongsTo(Media::class);
+    }
 
     /**
      * Get the chunks for this document.
@@ -58,5 +62,37 @@ class Document extends Model
     public function hasFailed(): bool
     {
         return $this->status === 'failed';
+    }
+
+    /**
+     * Get file URL from media.
+     */
+    public function getFileUrlAttribute(): ?string
+    {
+        return $this->media?->url;
+    }
+
+    /**
+     * Get file type from media.
+     */
+    public function getFileTypeAttribute(): ?string
+    {
+        return $this->media?->file_type;
+    }
+
+    /**
+     * Get file size from media.
+     */
+    public function getFileSizeAttribute(): ?int
+    {
+        return $this->media?->file_size;
+    }
+
+    /**
+     * Get formatted file size from media.
+     */
+    public function getFormattedFileSizeAttribute(): ?string
+    {
+        return $this->media?->formatted_size;
     }
 }

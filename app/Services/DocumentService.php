@@ -4,41 +4,41 @@ namespace App\Services;
 
 use App\Models\Document;
 use App\Models\DocumentChunk;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Http\UploadedFile;
 use Smalot\PdfParser\Parser as PdfParser;
 use PhpOffice\PhpWord\IOFactory as WordIOFactory;
+use Illuminate\Support\Facades\Log;
 use Exception;
 
 class DocumentService
 {
     protected OpenAIService $openAI;
+    protected MediaService $mediaService;
     protected int $chunkSize = 500; // tokens per chunk
     protected int $chunkOverlap = 50; // overlap between chunks
 
-    public function __construct(OpenAIService $openAI)
+    public function __construct(OpenAIService $openAI, MediaService $mediaService)
     {
         $this->openAI = $openAI;
+        $this->mediaService = $mediaService;
     }
 
     /**
-     * Upload and store a document.
+     * Upload and store a document to Cloudinary via MediaService.
      *
-     * @param UploadedFile $file
+     * @param \Illuminate\Http\UploadedFile $file
+     * @param int $userId
      * @return Document
      */
-    public function uploadDocument(UploadedFile $file): Document
+    public function uploadDocument(\Illuminate\Http\UploadedFile $file, int $userId): Document
     {
-        $filename = time() . '_' . $file->getClientOriginalName();
-        $path = $file->storeAs('documents', $filename, 'local');
+        // Upload to Cloudinary via MediaService
+        $media = $this->mediaService->uploadDocument($file, $userId);
 
+        // Create Document record referencing the media
         $document = Document::create([
-            'filename' => $filename,
+            'user_id' => $userId,
+            'media_id' => $media->id,
             'original_name' => $file->getClientOriginalName(),
-            'file_path' => $path,
-            'file_type' => $this->getFileType($file),
-            'file_size' => $file->getSize(),
             'status' => 'pending',
         ]);
 
@@ -74,6 +74,11 @@ class DocumentService
                 'chunks_count' => count($chunks),
             ]);
 
+            // Clean up local file after processing (Cloudinary has the permanent copy)
+            if ($document->media) {
+                $this->mediaService->cleanupLocalFile($document->media);
+            }
+
             Log::info('Document processed successfully', [
                 'document_id' => $document->id,
                 'chunks' => count($chunks),
@@ -102,13 +107,20 @@ class DocumentService
      */
     public function extractText(Document $document): string
     {
-        $fullPath = Storage::disk('local')->path($document->file_path);
+        $media = $document->media;
 
-        return match ($document->file_type) {
+        if (!$media) {
+            throw new Exception('Document has no associated media file.');
+        }
+
+        // Get local file path via MediaService
+        $fullPath = $this->mediaService->getLocalPath($media);
+
+        return match ($media->file_type) {
             'pdf' => $this->extractFromPdf($fullPath),
             'docx' => $this->extractFromDocx($fullPath),
             'txt', 'md' => $this->extractFromTxt($fullPath),
-            default => throw new Exception("Unsupported file type: {$document->file_type}"),
+            default => throw new Exception("Unsupported file type: {$media->file_type}"),
         };
     }
 
@@ -221,35 +233,21 @@ class DocumentService
     }
 
     /**
-     * Delete a document and its chunks.
+     * Delete a document and its media.
      *
      * @param Document $document
      * @return void
      */
     public function deleteDocument(Document $document): void
     {
-        // Delete the file
-        if (Storage::disk('local')->exists($document->file_path)) {
-            Storage::disk('local')->delete($document->file_path);
-        }
+        $media = $document->media;
 
         // Delete the document (chunks will be deleted via cascade)
         $document->delete();
-    }
 
-    /**
-     * Get file type from uploaded file.
-     */
-    protected function getFileType(UploadedFile $file): string
-    {
-        $extension = strtolower($file->getClientOriginalExtension());
-
-        return match ($extension) {
-            'pdf' => 'pdf',
-            'docx', 'doc' => 'docx',
-            'txt' => 'txt',
-            'md', 'markdown' => 'md',
-            default => $extension,
-        };
+        // Delete the media record and Cloudinary file via MediaService
+        if ($media) {
+            $this->mediaService->delete($media);
+        }
     }
 }

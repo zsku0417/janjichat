@@ -83,20 +83,21 @@ class DashboardController extends Controller
     protected function restaurantDashboard($user): Response
     {
         $stats = [
-            'total_conversations' => Conversation::count(),
-            'needs_reply' => Conversation::needsReply()->count(),
-            'total_bookings' => Booking::count(),
-            'upcoming_bookings' => Booking::upcoming()->count(),
-            'todays_bookings' => Booking::today()->where('status', 'confirmed')->count(),
-            'total_documents' => Document::where('status', 'completed')->count(),
-            'pending_documents' => Document::whereIn('status', ['pending', 'processing'])->count(),
+            'total_conversations' => Conversation::where('user_id', $user->id)->count(),
+            'needs_reply' => Conversation::where('user_id', $user->id)->needsReply()->count(),
+            'total_bookings' => Booking::where('user_id', $user->id)->count(),
+            'upcoming_bookings' => Booking::where('user_id', $user->id)->upcoming()->count(),
+            'todays_bookings' => Booking::where('user_id', $user->id)->today()->where('status', 'confirmed')->count(),
+            'total_documents' => Document::where('user_id', $user->id)->where('status', 'completed')->count(),
+            'pending_documents' => Document::where('user_id', $user->id)->whereIn('status', ['pending', 'processing'])->count(),
         ];
 
-        $recentConversations = Conversation::with([
-            'messages' => function ($query) {
-                $query->latest()->limit(1);
-            }
-        ])
+        $recentConversations = Conversation::where('user_id', $user->id)
+            ->with([
+                'messages' => function ($query) {
+                    $query->latest()->limit(1);
+                }
+            ])
             ->orderBy('last_message_at', 'desc')
             ->limit(5)
             ->get()
@@ -112,7 +113,8 @@ class DashboardController extends Controller
                 ];
             });
 
-        $upcomingBookings = Booking::upcoming()
+        $upcomingBookings = Booking::where('user_id', $user->id)
+            ->upcoming()
             ->with('table')
             ->limit(5)
             ->get()
@@ -141,8 +143,8 @@ class DashboardController extends Controller
     protected function orderTrackingDashboard($user): Response
     {
         $stats = [
-            'total_conversations' => Conversation::count(),
-            'needs_reply' => Conversation::needsReply()->count(),
+            'total_conversations' => Conversation::where('user_id', $user->id)->count(),
+            'needs_reply' => Conversation::where('user_id', $user->id)->needsReply()->count(),
             'total_products' => $user->products()->count(),
             'active_products' => $user->products()->active()->count(),
             'total_orders' => $user->orders()->count(),
@@ -150,14 +152,15 @@ class DashboardController extends Controller
             'processing_orders' => $user->orders()->where('status', 'processing')->count(),
             'completed_today' => $user->orders()->where('status', 'completed')
                 ->whereDate('updated_at', today())->count(),
-            'total_documents' => Document::where('status', 'completed')->count(),
+            'total_documents' => Document::where('user_id', $user->id)->where('status', 'completed')->count(),
         ];
 
-        $recentConversations = Conversation::with([
-            'messages' => function ($query) {
-                $query->latest()->limit(1);
-            }
-        ])
+        $recentConversations = Conversation::where('user_id', $user->id)
+            ->with([
+                'messages' => function ($query) {
+                    $query->latest()->limit(1);
+                }
+            ])
             ->orderBy('last_message_at', 'desc')
             ->limit(5)
             ->get()

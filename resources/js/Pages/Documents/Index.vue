@@ -3,7 +3,6 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import DataTable from "@/Components/DataTable.vue";
 import TableActionButton from "@/Components/TableActionButton.vue";
 import DeleteModal from "@/Components/DeleteModal.vue";
-import DocumentViewModal from "@/Components/DocumentViewModal.vue";
 import { Head, useForm, router } from "@inertiajs/vue3";
 import { ref } from "vue";
 
@@ -16,8 +15,6 @@ const columns = [
     { key: "original_name", label: "Document", sortable: true, width: "30%" },
     { key: "file_type", label: "Type", sortable: true },
     { key: "file_size", label: "Size", sortable: true },
-    // { key: "status", label: "Status", sortable: true, width: "12%" },
-    { key: "chunks_count", label: "Chunks", sortable: true },
     { key: "created_at", label: "Uploaded", sortable: true },
 ];
 
@@ -25,10 +22,6 @@ const fileInput = ref(null);
 const uploadForm = useForm({
     file: null,
 });
-
-// View modal state
-const showViewModal = ref(false);
-const viewingDocumentId = ref(null);
 
 // Delete modal state
 const showDeleteModal = ref(false);
@@ -79,44 +72,9 @@ const reprocessDocument = (id) => {
     router.post(route("documents.reprocess", id));
 };
 
-const viewDocument = (doc) => {
-    viewingDocumentId.value = doc.id;
-    showViewModal.value = true;
-};
-
-const closeViewModal = () => {
-    showViewModal.value = false;
-    viewingDocumentId.value = null;
-};
-
-const getStatusColor = (status) => {
-    switch (status) {
-        case "completed":
-            return "bg-success-100 dark:bg-success-900/30 text-success-700 dark:text-success-300";
-        case "processing":
-            return "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300";
-        case "pending":
-            return "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300";
-        case "failed":
-            return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300";
-        default:
-            return "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300";
-    }
-};
-
-const getFileIcon = (type) => {
-    switch (type?.toLowerCase()) {
-        case "pdf":
-            return "📄";
-        case "docx":
-        case "doc":
-            return "📝";
-        case "txt":
-            return "📃";
-        case "md":
-            return "📋";
-        default:
-            return "📁";
+const openFile = (url) => {
+    if (url) {
+        window.open(url, "_blank");
     }
 };
 </script>
@@ -270,9 +228,6 @@ const getFileIcon = (type) => {
                     <!-- Document Name Cell -->
                     <template #cell-original_name="{ row }">
                         <div class="flex items-center gap-3">
-                            <span class="text-2xl">{{
-                                getFileIcon(row.file_type)
-                            }}</span>
                             <div>
                                 <div
                                     class="font-medium text-gray-900 dark:text-white"
@@ -298,24 +253,13 @@ const getFileIcon = (type) => {
                         </span>
                     </template>
 
-                    <!-- Status Cell -->
-                    <template #cell-status="{ row }">
-                        <span
-                            :class="[
-                                getStatusColor(row.status),
-                                'px-3 py-1 text-xs font-medium rounded-full capitalize',
-                            ]"
-                        >
-                            {{ row.status }}
-                        </span>
-                    </template>
-
                     <!-- Actions -->
                     <template #actions="{ row }">
                         <TableActionButton
-                            v-if="row.status === 'completed'"
-                            type="view"
-                            @click="viewDocument(row)"
+                            v-if="row.file_url"
+                            type="external"
+                            tooltip="Open Original File"
+                            @click="openFile(row.file_url)"
                         />
                         <TableActionButton
                             v-if="row.status === 'failed'"
@@ -331,13 +275,6 @@ const getFileIcon = (type) => {
                 </DataTable>
             </div>
         </div>
-
-        <!-- View Document Modal -->
-        <DocumentViewModal
-            :show="showViewModal"
-            :document-id="viewingDocumentId"
-            @close="closeViewModal"
-        />
 
         <!-- Delete Modal -->
         <DeleteModal

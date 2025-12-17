@@ -85,7 +85,13 @@ class RestaurantHandler implements BusinessHandlerInterface
         // Handle based on intent
         switch ($intent) {
             case 'greeting':
+                // For greetings, let AI generate a friendly response without the booking form
+                // The initial greeting with options is already sent by ConversationHandler for new conversations
+                $this->handleSimpleGreeting($conversation, $merchant);
+                break;
+
             case 'booking_request':
+                // Show booking form for booking requests
                 $this->handleGreeting($conversation, $merchant);
                 break;
 
@@ -111,7 +117,28 @@ class RestaurantHandler implements BusinessHandlerInterface
     }
 
     /**
+     * Handle simple greeting - just a friendly response without booking form.
+     */
+    protected function handleSimpleGreeting(Conversation $conversation, User $merchant): void
+    {
+        $merchantSettings = $merchant->merchantSettings;
+        $businessName = $merchantSettings?->business_name ?? $merchant->name;
+
+        // Let AI generate a natural friendly response
+        $aiResponse = $this->rag->generateContextualResponse(
+            'greeting',
+            $conversation->messages()->orderByDesc('created_at')->first()->content,
+            ['business_name' => $businessName],
+            $conversation,
+            'restaurant'
+        );
+
+        $this->sendResponse($conversation, $aiResponse);
+    }
+
+    /**
      * Handle greeting for restaurant - let AI generate natural response with template awareness.
+     * Called for booking_request intent (shows booking form) - NOT for greeting intent.
      */
     public function handleGreeting(Conversation $conversation, User $merchant): void
     {

@@ -262,19 +262,67 @@ const addTailwindClasses = (html) => {
                                 </p>
                             </div>
                         </div>
-                        <div class="text-right">
-                            <div
-                                class="text-2xl font-bold text-primary-600 dark:text-primary-400"
+                        <div class="flex items-center gap-4">
+                            <!-- View Original File Button -->
+                            <a
+                                v-if="document.file_url"
+                                :href="document.file_url"
+                                target="_blank"
+                                class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-primary-500 to-secondary-500 rounded-lg hover:from-primary-600 hover:to-secondary-600 transition-all duration-200 flex items-center gap-2 shadow-md"
                             >
-                                {{ document.chunks_count }}
-                            </div>
-                            <div
-                                class="text-xs text-gray-500 dark:text-gray-400"
-                            >
-                                Chunks
+                                <svg
+                                    class="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                    />
+                                </svg>
+                                View Original
+                            </a>
+                            <div class="text-right">
+                                <div
+                                    class="text-2xl font-bold text-primary-600 dark:text-primary-400"
+                                >
+                                    {{ document.chunks_count }}
+                                </div>
+                                <div
+                                    class="text-xs text-gray-500 dark:text-gray-400"
+                                >
+                                    Chunks
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- PDF Viewer (for PDF files) -->
+                <div
+                    v-if="
+                        document.file_url &&
+                        document.file_type?.toLowerCase() === 'pdf'
+                    "
+                    class="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden"
+                >
+                    <div
+                        class="px-4 py-3 bg-gray-50 dark:bg-slate-700/50 border-b border-gray-200 dark:border-slate-700"
+                    >
+                        <h4
+                            class="font-medium text-gray-700 dark:text-gray-300"
+                        >
+                            Document Preview
+                        </h4>
+                    </div>
+                    <iframe
+                        :src="document.file_url"
+                        class="w-full h-[500px]"
+                        title="PDF Preview"
+                    ></iframe>
                 </div>
 
                 <!-- Chunks List -->

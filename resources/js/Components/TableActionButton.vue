@@ -1,7 +1,7 @@
 <script setup>
 /**
  * TableActionButton - Icon button for DataTable actions
- * 
+ *
  * Usage:
  *   <TableActionButton type="view" @click="viewItem(row)" />
  *   <TableActionButton type="edit" @click="editItem(row)" />
@@ -81,20 +81,30 @@ const typeConfig = {
         tooltip: "Refresh",
         variant: "primary",
     },
+    external: {
+        icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />`,
+        tooltip: "Open in New Tab",
+        variant: "primary",
+    },
 };
 
 // Resolved configuration
-const config = props.type && typeConfig[props.type] ? typeConfig[props.type] : {};
+const config =
+    props.type && typeConfig[props.type] ? typeConfig[props.type] : {};
 const resolvedTooltip = props.tooltip || config.tooltip || "";
 const resolvedVariant = props.variant || config.variant || "neutral";
 
 // Variant styles
 const variantStyles = {
-    primary: "text-primary-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20",
-    success: "text-success-500 hover:text-success-600 hover:bg-success-50 dark:hover:bg-success-900/20",
-    warning: "text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20",
+    primary:
+        "text-primary-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20",
+    success:
+        "text-success-500 hover:text-success-600 hover:bg-success-50 dark:hover:bg-success-900/20",
+    warning:
+        "text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20",
     danger: "text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20",
-    neutral: "text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-slate-700",
+    neutral:
+        "text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-slate-700",
 };
 
 const handleClick = (e) => {
@@ -111,8 +121,10 @@ const handleClick = (e) => {
         :class="[
             'w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-200',
             'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500',
-            disabled || loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
-            variantStyles[resolvedVariant]
+            disabled || loading
+                ? 'opacity-50 cursor-not-allowed'
+                : 'cursor-pointer',
+            variantStyles[resolvedVariant],
         ]"
         @click="handleClick"
     >
@@ -123,10 +135,21 @@ const handleClick = (e) => {
             fill="none"
             viewBox="0 0 24 24"
         >
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+            ></circle>
+            <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
         </svg>
-        
+
         <!-- Type-based icon -->
         <svg
             v-else-if="type && typeConfig[type]"
@@ -135,9 +158,8 @@ const handleClick = (e) => {
             stroke="currentColor"
             viewBox="0 0 24 24"
             v-html="config.icon"
-        >
-        </svg>
-        
+        ></svg>
+
         <!-- Custom content slot -->
         <slot v-else></slot>
     </button>

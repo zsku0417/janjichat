@@ -86,26 +86,23 @@ class ConversationHandler
             $conversation = $result['conversation'];
             $isNew = $result['isNew'];
 
-            // Send greeting for first message in conversation
             // Check if conversation has no prior messages (fresh start or cleared)
             $isFirstMessage = $isNew || $conversation->messages()->count() === 0;
 
-            // Send greeting FIRST, then continue to AI processing
-            // Customer gets 2 messages: 1. Greeting 2. AI response
-            if ($isFirstMessage) {
-                $this->sendInitialGreeting($conversation);
-
-                Log::info('First message in conversation - greeting sent, will also process with AI', [
-                    'conversation_id' => $conversation->id,
-                    'is_new_conversation' => $isNew,
-                ]);
-            }
-
-            // Store the incoming message
+            // Store the incoming message FIRST (before any responses)
             $message = $this->storeMessage($conversation, $messageData);
 
             // Update last message timestamp
             $conversation->update(['last_message_at' => now()]);
+
+            // Send greeting for first message in new conversation AFTER storing customer's message
+            if ($isFirstMessage) {
+                $this->sendInitialGreeting($conversation);
+
+                // Mark as read and skip AI processing - greeting is sufficient for first message
+                $this->whatsApp->markAsRead($messageData['message_id']);
+                return;
+            }
 
             // Check if conversation is in admin mode
             if ($conversation->isAdminMode()) {

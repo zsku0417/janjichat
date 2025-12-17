@@ -24,14 +24,18 @@ class DocumentController extends Controller
      */
     public function index(): Response
     {
-        $documents = Document::orderBy('created_at', 'desc')
+        $user = auth()->user();
+        $documents = Document::where('user_id', $user->id)
+            ->with('media')
+            ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($document) {
                 return [
                     'id' => $document->id,
                     'original_name' => $document->original_name,
-                    'file_type' => strtoupper($document->file_type),
-                    'file_size' => $this->formatFileSize($document->file_size),
+                    'file_type' => strtoupper($document->file_type ?? 'N/A'),
+                    'file_size' => $document->formatted_file_size ?? 'N/A',
+                    'file_url' => $document->file_url,
                     'status' => $document->status,
                     'chunks_count' => $document->chunks_count,
                     'error_message' => $document->error_message,
@@ -50,10 +54,10 @@ class DocumentController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'file' => 'required|file|mimes:pdf,docx,doc,txt|max:51200', // 50MB max
+            'file' => 'required|file|mimes:pdf,docx,doc,txt,md|max:51200', // 50MB max
         ]);
 
-        $document = $this->documentService->uploadDocument($request->file('file'));
+        $document = $this->documentService->uploadDocument($request->file('file'), auth()->id());
 
         // Dispatch async processing job
         ProcessDocumentJob::dispatch($document);
@@ -66,6 +70,11 @@ class DocumentController extends Controller
      */
     public function destroy(Document $document): RedirectResponse
     {
+        // Ensure user owns this document
+        if ($document->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized');
+        }
+
         $this->documentService->deleteDocument($document);
 
         return back()->with('success', 'Document deleted successfully!');
@@ -76,6 +85,11 @@ class DocumentController extends Controller
      */
     public function reprocess(Document $document): RedirectResponse
     {
+        // Ensure user owns this document
+        if ($document->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized');
+        }
+
         if ($document->status !== 'failed') {
             return back()->with('error', 'Only failed documents can be reprocessed.');
         }
@@ -95,6 +109,14 @@ class DocumentController extends Controller
      */
     public function show(Document $document)
     {
+        // Ensure user owns this document
+        if ($document->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized');
+        }
+
+        // Load media relationship
+        $document->load('media');
+
         $chunks = $document->chunks()
             ->orderBy('chunk_index')
             ->get()
@@ -110,22 +132,11 @@ class DocumentController extends Controller
             'id' => $document->id,
             'original_name' => $document->original_name,
             'file_type' => $document->file_type,
+            'file_size' => $document->formatted_file_size,
+            'file_url' => $document->file_url,
             'status' => $document->status,
             'chunks' => $chunks,
             'chunks_count' => $chunks->count(),
         ]);
-    }
-
-    /**
-     * Format file size for display.
-     */
-    protected function formatFileSize(int $bytes): string
-    {
-        if ($bytes >= 1048576) {
-            return round($bytes / 1048576, 2) . ' MB';
-        } elseif ($bytes >= 1024) {
-            return round($bytes / 1024, 2) . ' KB';
-        }
-        return $bytes . ' bytes';
     }
 }

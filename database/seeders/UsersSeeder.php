@@ -24,7 +24,7 @@ class UsersSeeder extends Seeder
     public function run(): void
     {
         // ========================================
-        // 1. Create Super Admin
+        // User Id-1. Create Super Admin
         // ========================================
         User::updateOrCreate(
             ['email' => 'admin@example.com'],
@@ -38,7 +38,7 @@ class UsersSeeder extends Seeder
         );
 
         // ========================================
-        // 2. Create Restaurant Merchant + Data
+        // User Id-2. Create Restaurant Merchant + Data
         // ========================================
         $restaurantMerchant = User::updateOrCreate(
             ['email' => 'restaurant@example.com'],
@@ -50,15 +50,15 @@ class UsersSeeder extends Seeder
                 'email_verified_at' => now(),
                 'email_verified' => true,
                 'is_active' => true,
-                'whatsapp_phone_number_id' => null,
-                'whatsapp_access_token' => null,
+                'whatsapp_phone_number_id' => 897500416781495,
+                'whatsapp_access_token' => 'EAA4FAbJVoycBQKGodDRl4SRKy3ZCYwF42E2AYj9C9NCyIZC02CgcBYdAsRsJZBHBKsMqZBv83QhJ376IZCXFppzniLZBb0tCFK7DOXeJrhq2tJCVSFEsolZCGAk0cavWd5A9ZAhuq7VtKAZBG83CvHNQ3gLagWfKlTBMAWhEYmssEdh5JZAtW871XmImmazFSYRgGhRQZDZD',
             ]
         );
 
         $this->seedRestaurantData($restaurantMerchant);
 
         // ========================================
-        // 3. Create Shop/Order Tracking Merchant + Data
+        // User Id-3. Create Shop/Order Tracking Merchant + Data
         // ========================================
         $shopMerchant = User::updateOrCreate(
             ['email' => 'shop@example.com'],
@@ -70,8 +70,8 @@ class UsersSeeder extends Seeder
                 'email_verified_at' => now(),
                 'email_verified' => true,
                 'is_active' => true,
-                'whatsapp_phone_number_id' => null,
-                'whatsapp_access_token' => null,
+                'whatsapp_phone_number_id' => 897500416781495,
+                'whatsapp_access_token' => 'EAA4FAbJVoycBQKGodDRl4SRKy3ZCYwF42E2AYj9C9NCyIZC02CgcBYdAsRsJZBHBKsMqZBv83QhJ376IZCXFppzniLZBb0tCFK7DOXeJrhq2tJCVSFEsolZCGAk0cavWd5A9ZAhuq7VtKAZBG83CvHNQ3gLagWfKlTBMAWhEYmssEdh5JZAtW871XmImmazFSYRgGhRQZDZD',
             ]
         );
 

@@ -2,6 +2,10 @@
 
 *"A Good Taste in Every Bite"*
 
+📍 No. 15, Jalan Delima 2/3, Taman Kluang Utama, 86000 Kluang, Johor  
+📞 +60 7-772 8899 | 📱 +60 12-772 8899  
+📸 @bonnebouche.kluang
+
 ---
 
 ## Our Culinary Philosophy
@@ -170,4 +174,4 @@ At Bonne Bouche Café, we believe great food brings people together. Our kitchen
 
 *Menu prices are subject to change. All prices are in Malaysian Ringgit (RM) and inclusive of SST.*
 
-**Follow us for daily specials and promotions!**
+**Follow us @bonnebouche.kluang for daily specials and promotions!**
