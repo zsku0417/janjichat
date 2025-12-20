@@ -18,7 +18,7 @@ class DocumentChunksSeeder extends Seeder
      */
     public function run(): void
     {
-        $csvPath = database_path('seeders/data/chunks.csv');
+        $csvPath = database_path('seeders/data/chunkss.csv');
         
         if (!file_exists($csvPath)) {
             $this->command->error("CSV file not found: {$csvPath}");

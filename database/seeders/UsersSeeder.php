@@ -70,7 +70,7 @@ class UsersSeeder extends Seeder
                 'email_verified_at' => now(),
                 'email_verified' => true,
                 'is_active' => true,
-                'whatsapp_phone_number_id' => 897500416781495,
+                'whatsapp_phone_number_id' => 89750041678149500,
                 'whatsapp_access_token' => 'EAA4FAbJVoycBQKGodDRl4SRKy3ZCYwF42E2AYj9C9NCyIZC02CgcBYdAsRsJZBHBKsMqZBv83QhJ376IZCXFppzniLZBb0tCFK7DOXeJrhq2tJCVSFEsolZCGAk0cavWd5A9ZAhuq7VtKAZBG83CvHNQ3gLagWfKlTBMAWhEYmssEdh5JZAtW871XmImmazFSYRgGhRQZDZD',
             ]
         );

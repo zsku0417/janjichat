@@ -26,6 +26,8 @@ ngrok http janjichat.test:80 --host-header=rewrite
 /api/webhook/whatsapp
 
 
+ngrok http janjichat.test:80 --host-header=rewrite
+php artisan reverb:start
 
 
 

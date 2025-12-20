@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\NewMessageEvent;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
@@ -220,7 +221,7 @@ class ConversationHandler
      */
     protected function storeMessage(Conversation $conversation, array $messageData): Message
     {
-        return Message::create([
+        $message = Message::create([
             'conversation_id' => $conversation->id,
             'direction' => 'inbound',
             'sender_type' => 'customer',
@@ -230,6 +231,11 @@ class ConversationHandler
             'status' => 'delivered',
             'metadata' => $messageData['metadata'],
         ]);
+
+        // Broadcast new message event for real-time frontend updates
+        broadcast(new NewMessageEvent($conversation, $message))->toOthers();
+
+        return $message;
     }
 
     /**
@@ -506,7 +512,7 @@ PROMPT;
             $result = $this->whatsApp->sendMessage($conversation->phone_number, $content);
 
             // Store the outgoing message
-            Message::create([
+            $message = Message::create([
                 'conversation_id' => $conversation->id,
                 'direction' => 'outbound',
                 'sender_type' => 'ai',
@@ -515,6 +521,9 @@ PROMPT;
                 'whatsapp_message_id' => $result['messages'][0]['id'] ?? null,
                 'status' => 'sent',
             ]);
+
+            // Broadcast new message event for real-time frontend updates
+            broadcast(new NewMessageEvent($conversation, $message))->toOthers();
 
         } catch (Exception $e) {
             Log::error('Failed to send response', [
@@ -602,6 +611,9 @@ PROMPT;
             'whatsapp_message_id' => $result['messages'][0]['id'] ?? null,
             'status' => 'sent',
         ]);
+
+        // Broadcast new message event for real-time frontend updates
+        broadcast(new NewMessageEvent($conversation, $message))->toOthers();
 
         // Mark as no longer needing reply
         $conversation->update(['needs_reply' => false]);

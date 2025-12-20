@@ -352,15 +352,15 @@ const getIcon = (iconName) => {
                     </template>
 
                     <template #content>
-                        <DropdownLink :href="route('profile.edit')">
-                            Profile
-                        </DropdownLink>
                         <DropdownLink
                             :href="route('logout')"
                             method="post"
                             as="button"
                         >
                             Log Out
+                        </DropdownLink>
+                        <DropdownLink :href="route('profile.edit')">
+                            Profile
                         </DropdownLink>
                     </template>
                 </Dropdown>

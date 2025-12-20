@@ -444,7 +444,6 @@ class RestaurantHandler implements BusinessHandlerInterface
                 'date' => $booking->booking_date->format('l, F j, Y'),
                 'time' => Carbon::parse($booking->booking_time)->format('g:i A'),
                 'pax' => $booking->pax,
-                'table' => $booking->table->name ?? 'Assigned',
                 'special_request' => $booking->special_request,
             ];
         })->toArray();
@@ -498,7 +497,6 @@ class RestaurantHandler implements BusinessHandlerInterface
                 'date' => $booking->booking_date->format('l, F j, Y'),
                 'time' => Carbon::parse($booking->booking_time)->format('g:i A'),
                 'pax' => $booking->pax,
-                'table' => $booking->table->name ?? 'Assigned',
                 'special_request' => $booking->special_request,
             ];
         })->toArray();
@@ -569,7 +567,6 @@ class RestaurantHandler implements BusinessHandlerInterface
                     'date' => $updatedBooking->booking_date->format('l, F j, Y'),
                     'time' => Carbon::parse($updatedBooking->booking_time)->format('g:i A'),
                     'pax' => $updatedBooking->pax,
-                    'table' => $updatedBooking->table->name ?? 'Assigned',
                     'special_request' => $updatedBooking->special_request,
                 ];
 
@@ -612,7 +609,6 @@ class RestaurantHandler implements BusinessHandlerInterface
             'date' => $booking->booking_date->format('l, F j, Y'),
             'time' => Carbon::parse($booking->booking_time)->format('g:i A'),
             'pax' => $booking->pax,
-            'table' => $booking->table->name ?? 'Assigned',
             'special_request' => $booking->special_request,
         ];
 
@@ -773,7 +769,6 @@ class RestaurantHandler implements BusinessHandlerInterface
                 'date' => $booking->booking_date->format('l, F j, Y'),
                 'time' => Carbon::parse($booking->booking_time)->format('g:i A'),
                 'pax' => $booking->pax,
-                'table' => $booking->table->name ?? 'Assigned',
             ];
         })->toArray();
 

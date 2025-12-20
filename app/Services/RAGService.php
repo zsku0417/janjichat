@@ -148,10 +148,12 @@ class RAGService
 
         // Ask AI to respond with confidence evaluation
         $evaluationPrompt = $systemPrompt . "\n\n" .
-            "IMPORTANT RULES:\n" .
-            "1. LANGUAGE: Detect the language of the customer's message and REPLY IN THE SAME LANGUAGE. " .
-            "If they write in Chinese, reply in Chinese. If in Malay, reply in Malay. Match their language exactly.\n\n" .
-            "2. CONFIDENCE: You must evaluate your confidence in your answer.\n" .
+            "CRITICAL LANGUAGE RULE (MUST FOLLOW FIRST):\n" .
+            "STEP 1: Detect the language of the customer's CURRENT query below.\n" .
+            "STEP 2: Your response MUST be written ENTIRELY in that same language.\n" .
+            "Examples: 'What time?' = English reply | '几点?' = Chinese reply | 'Pukul berapa?' = Malay reply\n" .
+            "DO NOT DEFAULT TO CHINESE. If the customer writes in ENGLISH, reply in ENGLISH.\n\n" .
+            "CONFIDENCE RULE:\n" .
             "You can be confident if you can answer from EITHER:\n" .
             "- The conversation history (what the customer told you earlier in this chat)\n" .
             "- The knowledge base context\n\n" .
@@ -160,7 +162,8 @@ class RAGService
             "Only indicate low confidence if the information is not in either source.\n\n" .
             "Respond in JSON format:\n" .
             "{\n" .
-            "  \"response\": \"Your response to the customer IN THEIR LANGUAGE (or null if not confident)\",\n" .
+            "  \"detected_language\": \"The language of the customer's message (english/chinese/malay/other)\",\n" .
+            "  \"response\": \"Your response written ENTIRELY in the detected_language\",\n" .
             "  \"confident\": true/false,\n" .
             "  \"reason\": \"If not confident, explain why in 1-2 sentences\"\n" .
             "}";
@@ -632,13 +635,14 @@ PROMPT;
 
                     CRITICAL INSTRUCTIONS (MUST FOLLOW):
                     
-                    1. **LANGUAGE MATCHING (HIGHEST PRIORITY)**:
-                       - Detect the language of the CUSTOMER'S LATEST MESSAGE above
-                       - You MUST reply in the SAME language
-                       - If customer writes in 中文 (Chinese), reply in 中文
-                       - If customer writes in Bahasa Melayu, reply in Bahasa Melayu  
-                       - If customer writes in English, reply in English
-                       - Do NOT mix languages. Do NOT default to English or Malay when customer writes Chinese.
+                    1. **LANGUAGE MATCHING (ABSOLUTE PRIORITY - CHECK FIRST)**:
+                       - Look at the CUSTOMER'S LATEST MESSAGE above
+                       - If the message is in ENGLISH (like "Nice", "OK", "Yes"), reply in ENGLISH
+                       - If the message is in 中文 (Chinese), reply in 中文
+                       - If the message is in Bahasa Melayu, reply in Bahasa Melayu
+                       - WARNING: Do NOT default to Chinese when customer writes English!
+                       - The word "Nice" is ENGLISH - reply in English.
+                       - The word "OK" is ENGLISH - reply in English.
                     
                     2. Generate a natural, conversational response
                     3. Be warm and helpful, use appropriate emojis sparingly

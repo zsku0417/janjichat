@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
-import { Head, useForm, router } from "@inertiajs/vue3";
+import { Head, useForm, router, usePage } from "@inertiajs/vue3";
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 
 const props = defineProps({
@@ -22,7 +22,10 @@ const selectedConversationId = ref(props.selectedConversation?.id || null);
 const conversationData = ref(props.selectedConversation || null);
 const messagesData = ref(props.messages || []);
 
-let pollInterval = null;
+// Echo channel subscription (replaces polling)
+let echoChannel = null;
+const page = usePage();
+const currentUserId = computed(() => page.props.auth.user?.id);
 
 // Reply form
 const replyForm = useForm({
@@ -469,7 +472,7 @@ const refreshChatData = async () => {
     }
 };
 
-// Combined refresh for polling
+// Combined refresh (kept for manual refresh if needed)
 const refreshAll = () => {
     refreshConversationsList();
     if (selectedConversationId.value) {
@@ -477,9 +480,45 @@ const refreshAll = () => {
     }
 };
 
-// Start polling when component mounts
+// Setup Echo WebSocket listener when component mounts
 onMounted(() => {
-    pollInterval = setInterval(refreshAll, 5000);
+    // Subscribe to the merchant's private channel for real-time updates
+    if (currentUserId.value && window.Echo) {
+        echoChannel = window.Echo.private(
+            `conversations.${currentUserId.value}`
+        )
+            .listen(".message.new", (event) => {
+                console.log("New message received via WebSocket:", event);
+
+                // Refresh the conversations list to update last message preview
+                refreshConversationsList();
+
+                // If the event is for the currently selected conversation, refresh chat
+                if (event.conversation_id === selectedConversationId.value) {
+                    refreshChatData();
+                }
+            })
+            .listen(".conversation.updated", (event) => {
+                console.log("Conversation updated via WebSocket:", event);
+
+                // Refresh conversations list to show mode/escalation changes
+                refreshConversationsList();
+
+                // If the event is for the currently selected conversation, refresh chat metadata
+                if (event.conversation_id === selectedConversationId.value) {
+                    refreshChatData();
+                }
+            });
+
+        console.log("Echo subscribed to conversations." + currentUserId.value);
+    } else {
+        console.warn(
+            "Echo not available or user not logged in, falling back to polling"
+        );
+        // Fallback to polling if Echo is not available
+        const pollInterval = setInterval(refreshAll, 5000);
+        onUnmounted(() => clearInterval(pollInterval));
+    }
 
     // Check if we have a selected conversation from URL (e.g., from Dashboard)
     const selectedFromUrl = props.selected;
@@ -500,10 +539,15 @@ onMounted(() => {
     }
 });
 
-// Stop polling when component unmounts
+// Cleanup Echo subscription when component unmounts
 onUnmounted(() => {
-    if (pollInterval) {
-        clearInterval(pollInterval);
+    if (echoChannel) {
+        echoChannel.stopListening(".message.new");
+        echoChannel.stopListening(".conversation.updated");
+        window.Echo?.leave(`conversations.${currentUserId.value}`);
+        console.log(
+            "Echo unsubscribed from conversations." + currentUserId.value
+        );
     }
 });
 

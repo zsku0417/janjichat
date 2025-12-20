@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\ConversationUpdatedEvent;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -111,6 +112,9 @@ class Conversation extends Model
             'needs_reply' => true,
             'escalation_reason' => $reason,
         ]);
+
+        // Broadcast conversation status change for real-time UI updates
+        broadcast(new ConversationUpdatedEvent($this))->toOthers();
 
         // Send email notification if enabled
         $this->sendEscalationEmail($reason);
