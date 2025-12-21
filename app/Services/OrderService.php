@@ -23,10 +23,18 @@ class OrderService
 
     /**
      * Get the order form template for the merchant.
+     * Uses custom template from settings if set, otherwise falls back to default.
      */
     public function getOrderFormTemplate(User $merchant): string
     {
-        $businessName = $merchant->name ?? 'Our Store';
+        // Check for custom template in merchant settings
+        $setting = $merchant->merchantSetting;
+        if ($setting && !empty($setting->booking_form_template)) {
+            return $setting->booking_form_template;
+        }
+
+        // Default template
+        $businessName = $setting?->business_name ?? $merchant->name ?? 'Our Store';
 
         return <<<TEMPLATE
 Welcome to {$businessName}! 🛒
@@ -128,16 +136,38 @@ PROMPT;
                     $requestedDatetime = now()->addDay(); // Default to tomorrow
                 }
 
+                // Generate unique order code for this merchant
+                // Get order prefix from OrderTrackingSetting if available
+                $orderPrefix = $merchant->orderTrackingSetting?->order_prefix;
+
+                // Find the last order number for this merchant
+                $lastOrder = Order::where('user_id', $merchant->id)
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                // Extract numeric part from last order code  
+                $lastNumber = 0;
+                if ($lastOrder && $lastOrder->code) {
+                    // Remove prefix if present to get just the number
+                    $numericPart = preg_replace('/^[A-Za-z]+-/', '', $lastOrder->code);
+                    $lastNumber = (int) $numericPart;
+                }
+
+                $nextNumber = $lastNumber + 1;
+                $numberPart = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+                $orderCode = $orderPrefix ? "{$orderPrefix}-{$numberPart}" : $numberPart;
+
                 // Create the order
                 $order = Order::create([
                     'user_id' => $merchant->id,
                     'conversation_id' => $conversation->id,
+                    'code' => $orderCode,
                     'customer_name' => $conversation->customer_name ?? 'Customer',
                     'customer_phone' => $conversation->phone_number ?? $conversation->whatsapp_id,
                     'fulfillment_type' => $fulfillmentType,
                     'delivery_address' => $orderData['delivery_address'] ?? null,
                     'requested_datetime' => $requestedDatetime,
-                    'special_notes' => $orderData['special_notes'] ?? null,
+                    'notes' => $orderData['special_notes'] ?? null,
                     'status' => Order::STATUS_PENDING_PAYMENT,
                     'total_amount' => 0,
                 ]);
@@ -191,11 +221,13 @@ PROMPT;
 
     /**
      * Generate order confirmation message.
+     * Uses custom template from settings if set, otherwise falls back to default.
      */
     public function getOrderConfirmationMessage(Order $order): string
     {
-        $order->load('items');
+        $order->load(['items', 'user.merchantSettings']);
 
+        // Prepare data for placeholders
         $itemsList = $order->items->map(function ($item) {
             return "• {$item->product_name} x{$item->quantity} - RM" . number_format($item->subtotal, 2);
         })->implode("\n");
@@ -204,12 +236,32 @@ PROMPT;
             ? '🏪 Pickup'
             : "🚚 Delivery to: {$order->delivery_address}";
 
-        $notes = $order->special_notes ? "\n📝 Notes: {$order->special_notes}" : '';
+        $notes = $order->notes ? "\n📝 Notes: {$order->notes}" : '';
 
+        // Check for custom template
+        $setting = $order->user?->merchantSettings;
+        if ($setting && !empty($setting->confirmation_template)) {
+            // Replace placeholders in custom template
+            $template = $setting->confirmation_template;
+            $replacements = [
+                '{name}' => $order->customer_name,
+                '{order_code}' => $order->code,
+                '{total}' => 'RM' . $order->formatted_total,
+                '{items}' => $itemsList,
+                '{datetime}' => $order->requested_datetime?->format('d M Y, g:i A') ?? 'TBD',
+                '{fulfillment}' => $fulfillment,
+                '{phone}' => $order->customer_phone,
+                '{notes}' => $notes,
+            ];
+
+            return str_replace(array_keys($replacements), array_values($replacements), $template);
+        }
+
+        // Default template
         return <<<MESSAGE
 ✅ *Order Confirmed!*
 
-Order #{$order->id}
+Order #{$order->code}
 
 *Items:*
 {$itemsList}
@@ -271,5 +323,283 @@ MESSAGE;
         }
 
         return false;
+    }
+
+    /**
+     * Get orders by conversation ID.
+     */
+    public function getOrdersByConversation(int $conversationId): \Illuminate\Support\Collection
+    {
+        return Order::where('conversation_id', $conversationId)
+            ->whereNotIn('status', [Order::STATUS_CANCELLED, Order::STATUS_COMPLETED])
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * Get orders by customer phone number.
+     */
+    public function getCustomerOrders(string $phone, ?int $userId = null): \Illuminate\Support\Collection
+    {
+        $query = Order::where('customer_phone', $phone)
+            ->whereNotIn('status', [Order::STATUS_CANCELLED, Order::STATUS_COMPLETED])
+            ->orderBy('created_at', 'desc');
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Parse order changes from customer message using AI.
+     */
+    public function parseOrderChanges(string $message, Order $order, Conversation $conversation): array
+    {
+        $order->load('items');
+
+        $currentOrderInfo = "Current order details:\n";
+        $currentOrderInfo .= "- Order ID: #{$order->id}\n";
+        $currentOrderInfo .= "- Items: " . $order->items->map(fn($i) => "{$i->product_name} x{$i->quantity}")->implode(', ') . "\n";
+        $currentOrderInfo .= "- Requested datetime: " . ($order->requested_datetime?->format('Y-m-d H:i') ?? 'Not set') . "\n";
+        $currentOrderInfo .= "- Fulfillment: {$order->fulfillment_type}\n";
+        if ($order->delivery_address) {
+            $currentOrderInfo .= "- Delivery address: {$order->delivery_address}\n";
+        }
+
+        $conversationHistory = $this->getConversationHistoryForContext($conversation);
+
+        $prompt = <<<PROMPT
+You are helping a customer modify their order.
+
+{$currentOrderInfo}
+
+Conversation history:
+{$conversationHistory}
+
+Customer's modification request:
+"{$message}"
+
+Current date/time: {now}
+
+Extract ONLY the NEW details the customer wants to change. Return a JSON object with:
+- datetime: new datetime in "YYYY-MM-DD HH:mm" format (only if customer specified a new time)
+- delivery_address: new address (only if customer wants to change delivery location)
+- fulfillment_type: "pickup" or "delivery" (only if customer wants to change)
+- special_notes: additional notes (only if customer mentioned new notes)
+- add_items: array of {name: string, quantity: number} to add
+- remove_items: array of product names to remove
+
+Only include fields that the customer explicitly mentioned changing. Use null for unchanged fields.
+If the customer is just asking what can be changed or asking about their order without providing new details, return all nulls.
+
+Return ONLY valid JSON, no markdown.
+PROMPT;
+
+        $prompt = str_replace('{now}', now()->format('Y-m-d H:i'), $prompt);
+
+        try {
+            $response = $this->openAI->chat([
+                ['role' => 'user', 'content' => $prompt]
+            ]);
+
+            $response = preg_replace('/```json\s*/', '', $response);
+            $response = preg_replace('/```\s*/', '', $response);
+            $response = trim($response);
+
+            $parsed = json_decode($response, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::warning('Failed to parse AI order change response', [
+                    'response' => $response,
+                    'error' => json_last_error_msg(),
+                ]);
+                return [];
+            }
+
+            // Filter out null values
+            return array_filter($parsed, fn($v) => $v !== null && $v !== '' && (!is_array($v) || !empty($v)));
+        } catch (Exception $e) {
+            Log::error('Failed to parse order changes with AI', [
+                'error' => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
+
+    /**
+     * Get conversation history for AI context.
+     */
+    protected function getConversationHistoryForContext(Conversation $conversation): string
+    {
+        $messages = $conversation->messages()
+            ->orderBy('created_at', 'desc')
+            ->take(10)
+            ->get()
+            ->reverse();
+
+        $history = "";
+        foreach ($messages as $msg) {
+            $role = $msg->direction === 'inbound' ? 'Customer' : 'Assistant';
+            $history .= "{$role}: {$msg->content}\n";
+        }
+
+        return $history;
+    }
+
+    /**
+     * Modify an existing order.
+     */
+    public function modifyOrder(Order $order, array $changes): Order
+    {
+        $updateData = [];
+
+        if (isset($changes['datetime'])) {
+            $updateData['requested_datetime'] = Carbon::parse($changes['datetime']);
+        }
+
+        if (isset($changes['delivery_address'])) {
+            $updateData['delivery_address'] = $changes['delivery_address'];
+            $updateData['fulfillment_type'] = 'delivery';
+        }
+
+        if (isset($changes['fulfillment_type'])) {
+            $updateData['fulfillment_type'] = $changes['fulfillment_type'];
+            if ($changes['fulfillment_type'] === 'pickup') {
+                $updateData['delivery_address'] = null;
+            }
+        }
+
+        if (isset($changes['special_notes'])) {
+            $existingNotes = $order->notes ?? '';
+            $updateData['notes'] = trim($existingNotes . "\n" . $changes['special_notes']);
+        }
+
+        if (!empty($updateData)) {
+            $order->update($updateData);
+        }
+
+        // Handle adding items
+        if (!empty($changes['add_items'])) {
+            $merchant = $order->user;
+            foreach ($changes['add_items'] as $itemData) {
+                $productName = $itemData['name'];
+                $quantity = (int) ($itemData['quantity'] ?? 1);
+
+                $product = $merchant->products()
+                    ->where('name', 'LIKE', "%{$productName}%")
+                    ->active()
+                    ->first();
+
+                $unitPrice = $product?->price ?? 0;
+                $subtotal = $unitPrice * $quantity;
+
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => $product?->id,
+                    'product_name' => $product?->name ?? $productName,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'subtotal' => $subtotal,
+                ]);
+            }
+
+            // Recalculate total
+            $order->update([
+                'total_amount' => $order->items()->sum('subtotal')
+            ]);
+        }
+
+        // Handle removing items
+        if (!empty($changes['remove_items'])) {
+            foreach ($changes['remove_items'] as $productName) {
+                $order->items()
+                    ->where('product_name', 'LIKE', "%{$productName}%")
+                    ->delete();
+            }
+
+            // Recalculate total
+            $order->update([
+                'total_amount' => $order->items()->sum('subtotal')
+            ]);
+        }
+
+        Log::info('Order modified', [
+            'order_id' => $order->id,
+            'changes' => $changes,
+        ]);
+
+        return $order->fresh(['items']);
+    }
+
+    /**
+     * Cancel an order.
+     */
+    public function cancelOrder(Order $order): Order
+    {
+        $order->update([
+            'status' => Order::STATUS_CANCELLED,
+        ]);
+
+        Log::info('Order cancelled', [
+            'order_id' => $order->id,
+        ]);
+
+        return $order->fresh();
+    }
+
+    /**
+     * Generate order reminder message.
+     * Uses custom template from settings if set, otherwise falls back to default.
+     */
+    public function getOrderReminderMessage(Order $order): string
+    {
+        $order->load(['items', 'user.merchantSettings']);
+
+        $itemsList = $order->items->map(function ($item) {
+            return "• {$item->product_name} x{$item->quantity}";
+        })->implode("\n");
+
+        $fulfillment = $order->fulfillment_type === 'pickup'
+            ? '🏪 Pickup'
+            : "🚚 Delivery to: {$order->delivery_address}";
+
+        // Check for custom template
+        $setting = $order->user?->merchantSettings;
+        if ($setting && !empty($setting->reminder_template)) {
+            $template = $setting->reminder_template;
+            $replacements = [
+                '{name}' => $order->customer_name,
+                '{order_code}' => $order->code,
+                '{total}' => 'RM' . $order->formatted_total,
+                '{items}' => $itemsList,
+                '{datetime}' => $order->requested_datetime?->format('d M Y, g:i A') ?? 'TBD',
+                '{fulfillment}' => $fulfillment,
+                '{phone}' => $order->customer_phone,
+            ];
+
+            return str_replace(array_keys($replacements), array_values($replacements), $template);
+        }
+
+        // Default template
+        return <<<MESSAGE
+⏰ *Order Reminder*
+
+Hi {$order->customer_name}!
+
+This is a friendly reminder about your upcoming order:
+
+Order #{$order->code}
+📅 *Scheduled for:* {$order->requested_datetime->format('d M Y, g:i A')}
+{$fulfillment}
+
+*Items:*
+{$itemsList}
+
+💰 *Total: RM{$order->formatted_total}*
+
+See you soon! 🙏
+MESSAGE;
     }
 }

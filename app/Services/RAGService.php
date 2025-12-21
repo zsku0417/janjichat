@@ -24,32 +24,54 @@ class RAGService
 
     /**
      * Search the knowledge base for relevant content.
+     * Filters by user_id to ensure multi-tenancy (each merchant sees only their own documents).
      *
      * @param string $query
+     * @param int|null $userId The merchant's user ID to filter documents
      * @param int $limit
      * @return Collection
      */
-    public function search(string $query, int $limit = 5): Collection
+    public function search(string $query, ?int $userId = null, int $limit = 5): Collection
     {
         // Generate embedding for the query
         $queryEmbedding = $this->openAI->createEmbedding($query);
         $embeddingString = '[' . implode(',', $queryEmbedding) . ']';
 
-        // Perform vector similarity search using pgvector
-        $results = DB::select("
-            SELECT 
-                dc.id,
-                dc.document_id,
-                dc.content,
-                dc.chunk_index,
-                d.original_name as document_name,
-                1 - (dc.embedding <=> ?::vector) as similarity
-            FROM document_chunks dc
-            JOIN documents d ON d.id = dc.document_id
-            WHERE d.status = 'completed'
-            ORDER BY dc.embedding <=> ?::vector
-            LIMIT ?
-        ", [$embeddingString, $embeddingString, $limit]);
+        // Build query with optional user_id filter for multi-tenancy
+        if ($userId) {
+            // Filter by merchant's documents only
+            $results = DB::select("
+                SELECT 
+                    dc.id,
+                    dc.document_id,
+                    dc.content,
+                    dc.chunk_index,
+                    d.original_name as document_name,
+                    1 - (dc.embedding <=> ?::vector) as similarity
+                FROM document_chunks dc
+                JOIN documents d ON d.id = dc.document_id
+                WHERE d.status = 'completed'
+                AND d.user_id = ?
+                ORDER BY dc.embedding <=> ?::vector
+                LIMIT ?
+            ", [$embeddingString, $userId, $embeddingString, $limit]);
+        } else {
+            // No user filter (backward compatibility, though not recommended)
+            $results = DB::select("
+                SELECT 
+                    dc.id,
+                    dc.document_id,
+                    dc.content,
+                    dc.chunk_index,
+                    d.original_name as document_name,
+                    1 - (dc.embedding <=> ?::vector) as similarity
+                FROM document_chunks dc
+                JOIN documents d ON d.id = dc.document_id
+                WHERE d.status = 'completed'
+                ORDER BY dc.embedding <=> ?::vector
+                LIMIT ?
+            ", [$embeddingString, $embeddingString, $limit]);
+        }
 
         return collect($results);
     }
@@ -65,8 +87,11 @@ class RAGService
      */
     public function generateResponse(string $query, Conversation $conversation, string $businessType = 'restaurant'): array
     {
-        // Step 1: Search knowledge base for relevant documents
-        $searchResults = $this->search($query);
+        // Get merchant ID for filtering documents (multi-tenancy)
+        $merchantId = $conversation->user_id;
+
+        // Step 1: Search knowledge base for relevant documents (filtered by merchant)
+        $searchResults = $this->search($query, $merchantId);
         $topScore = $searchResults->first()?->similarity ?? 0;
 
         // Step 2: Build context from knowledge base (even if low score, include what we found)
@@ -138,7 +163,7 @@ class RAGService
         Conversation $conversation,
         string $businessType = 'restaurant'
     ): array {
-        $systemPrompt = $this->buildSystemPrompt($context, $businessType);
+        $systemPrompt = $this->buildSystemPrompt($context, $businessType, $conversation);
 
         // Add the current query to history
         $conversationHistory[] = [
@@ -209,13 +234,14 @@ class RAGService
 
     /**
      * Build the system prompt for the AI based on business type.
+     * For order_tracking, includes the merchant's product catalog.
      */
-    protected function buildSystemPrompt(string $context, string $businessType = 'restaurant'): string
+    protected function buildSystemPrompt(string $context, string $businessType = 'restaurant', ?Conversation $conversation = null): string
     {
         $settings = RestaurantSetting::getInstance();
 
-        // Get merchant settings for ai_tone and business_name
-        $merchant = User::where('role', User::ROLE_MERCHANT)->first();
+        // Get merchant from conversation (preferred) or fallback to first merchant
+        $merchant = $conversation?->user ?? User::where('role', User::ROLE_MERCHANT)->first();
         $merchantSettings = $merchant ? MerchantSetting::where('user_id', $merchant->id)->first() : null;
 
         $tone = $merchantSettings?->ai_tone ?? 'You are a friendly and professional assistant.';
@@ -227,6 +253,23 @@ class RAGService
         // Get business-specific configuration
         $config = $this->getBusinessConfig($businessType);
 
+        // Build product catalog for order_tracking businesses
+        $productCatalog = '';
+        if ($businessType === 'order_tracking' && $merchant) {
+            $products = $merchant->products()->active()->get();
+            if ($products->isNotEmpty()) {
+                $productCatalog = "\n\nPRODUCT CATALOG (Available Products):\n";
+                foreach ($products as $product) {
+                    $productCatalog .= "• {$product->name} - RM" . number_format((float) $product->price, 2);
+                    if ($product->description) {
+                        $productCatalog .= " - {$product->description}";
+                    }
+                    $productCatalog .= "\n";
+                }
+                $productCatalog .= "\nWhen customers ask about products, use this catalog to answer. You can suggest products based on their preferences.";
+            }
+        }
+
         return <<<PROMPT
 {$tone}
 
@@ -236,6 +279,7 @@ You are an AI assistant for {$businessName}. Your role is to help customers with
 3. {$config['role3']}
 
 Operating Hours: {$operatingHours}
+{$productCatalog}
 
 KNOWLEDGE BASE CONTEXT:
 {$context}
@@ -513,13 +557,19 @@ PROMPT;
             $context .= $data['booking_form_template'] . "\n\n";
         }
 
+        // Order tracking templates
+        if (isset($data['order_form_template'])) {
+            $context .= "ORDER FORM TEMPLATE (Use this when customer wants to place an order):\n";
+            $context .= $data['order_form_template'] . "\n\n";
+        }
+
         if (isset($data['confirmation_template'])) {
-            $context .= "BOOKING CONFIRMATION TEMPLATE:\n";
+            $context .= "CONFIRMATION TEMPLATE:\n";
             $context .= $data['confirmation_template'] . "\n\n";
         }
 
         if (isset($data['reminder_template'])) {
-            $context .= "BOOKING REMINDER TEMPLATE:\n";
+            $context .= "REMINDER TEMPLATE:\n";
             $context .= $data['reminder_template'] . "\n\n";
         }
 
@@ -551,9 +601,27 @@ PROMPT;
         if (isset($data['orders']) && is_array($data['orders'])) {
             $context .= "CUSTOMER'S ORDERS:\n";
             foreach ($data['orders'] as $order) {
-                $context .= "- Order #{$order['id']}: {$order['status']}\n";
+                // Support numbered format for selection
+                $prefix = isset($order['number']) ? "{$order['number']}. " : "";
+                $context .= "{$prefix}Order #{$order['id']}";
+                if (isset($order['status'])) {
+                    $context .= " - {$order['status']}";
+                }
+                $context .= "\n";
                 if (!empty($order['items'])) {
-                    $context .= "  Items: {$order['items']}\n";
+                    $context .= "   Items: {$order['items']}\n";
+                }
+                if (!empty($order['total'])) {
+                    $context .= "   Total: {$order['total']}\n";
+                }
+                if (!empty($order['datetime'])) {
+                    $context .= "   Scheduled: {$order['datetime']}\n";
+                }
+                if (!empty($order['fulfillment'])) {
+                    $context .= "   Fulfillment: {$order['fulfillment']}\n";
+                }
+                if (!empty($order['delivery_address'])) {
+                    $context .= "   Delivery Address: {$order['delivery_address']}\n";
                 }
                 $context .= "\n";
             }

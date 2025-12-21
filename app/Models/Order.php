@@ -24,12 +24,13 @@ class Order extends Model
     protected $fillable = [
         'user_id',
         'conversation_id',
+        'code',
         'customer_name',
         'customer_phone',
         'fulfillment_type',
         'delivery_address',
         'requested_datetime',
-        'special_notes',
+        'notes',
         'status',
         'total_amount',
     ];

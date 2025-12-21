@@ -16,9 +16,9 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             UsersSeeder::class,
-            MediaSeeder::class,
-            DocumentsTableSeeder::class,
-            DocumentChunksSeeder::class,
+            // MediaSeeder::class,
+            // DocumentsTableSeeder::class,
+            // DocumentChunksSeeder::class,
         ]);
     }
 }

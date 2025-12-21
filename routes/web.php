@@ -64,12 +64,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/products/{product}', [ProductController::class, 'update'])->name('products.update');
     Route::delete('/products/{product}', [ProductController::class, 'destroy'])->name('products.destroy');
     Route::post('/products/{product}/toggle-active', [ProductController::class, 'toggleActive'])->name('products.toggle-active');
+    Route::post('/products/{product}/images', [ProductController::class, 'uploadImages'])->name('products.images.upload');
+    Route::delete('/products/{product}/images/{media}', [ProductController::class, 'deleteImage'])->name('products.images.delete');
+    Route::get('/products/{product}/orders', [ProductController::class, 'getOrders'])->name('products.orders');
+    Route::get('/products/{product}/orders/export', [ProductController::class, 'exportOrders'])->name('products.orders.export');
 
     // Orders
     Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
     Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::patch('/orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.update-status');
     Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
+    Route::delete('/orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

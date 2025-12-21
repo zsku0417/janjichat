@@ -379,14 +379,26 @@ class ConversationHandler
             case Conversation::CONTEXT_AWAITING_CANCELLATION_CONFIRMATION:
                 if ($responseType === 'affirmative') {
                     $bookingId = $contextData['booking_id'] ?? null;
-                    $orderId = $contextData['order_id'] ?? null;
                     $conversation->clearContext();
 
                     if ($bookingId && $handler instanceof RestaurantHandler) {
                         $handler->confirmBookingCancellation($conversation, $bookingId);
                         return true;
                     }
-                    // TODO: Add order cancellation handling when implemented
+                } elseif ($responseType === 'negative') {
+                    $conversation->clearContext();
+                    $this->sendResponse($conversation, self::MSG_CHANGES_CANCELLED);
+                    return true;
+                }
+                break;
+
+            case Conversation::CONTEXT_AWAITING_ORDER_CANCELLATION_CONFIRMATION:
+                if ($responseType === 'affirmative') {
+                    $orderId = $contextData['order_id'] ?? null;
+                    if ($orderId && $handler instanceof OrderTrackingHandler) {
+                        $handler->executeCancellation($conversation, $orderId);
+                        return true;
+                    }
                 } elseif ($responseType === 'negative') {
                     $conversation->clearContext();
                     $this->sendResponse($conversation, self::MSG_CHANGES_CANCELLED);
@@ -407,7 +419,9 @@ class ConversationHandler
     {
         $contextDescription = match ($contextType) {
             Conversation::CONTEXT_AWAITING_BOOKING_CONFIRMATION => 'making a reservation or booking',
-            Conversation::CONTEXT_AWAITING_CANCELLATION_CONFIRMATION => 'cancelling a booking or order',
+            Conversation::CONTEXT_AWAITING_ORDER_CONFIRMATION => 'placing an order',
+            Conversation::CONTEXT_AWAITING_CANCELLATION_CONFIRMATION => 'cancelling a booking',
+            Conversation::CONTEXT_AWAITING_ORDER_CANCELLATION_CONFIRMATION => 'cancelling an order',
             Conversation::CONTEXT_ORDER_FLOW => 'placing an order',
             default => 'a yes/no question',
         };

@@ -11,6 +11,52 @@ const emit = defineEmits(["saved"]);
 
 // Check business type for conditional fields
 const isRestaurant = computed(() => props.businessType === "restaurant");
+const isOrderTracking = computed(() => props.businessType === "order_tracking");
+
+// Dynamic labels based on business type
+const labels = computed(() => {
+    if (isOrderTracking.value) {
+        return {
+            formTemplate: "Order Form Template",
+            formTemplatePlaceholder: "Enter your order form template...",
+            formTemplateHelp:
+                "The template shown to customers when they want to place an order. Leave empty to use the default template.",
+            confirmationTemplate: "Order Confirmation Template",
+            confirmationPlaceholder:
+                "Your order is confirmed! Order #: {order_code}, Total: {total}",
+            confirmationHelp:
+                "Message sent to customers after successful order. Use placeholders: {name}, {order_code}, {total}, {items}, {datetime}, {fulfillment}",
+            reminderTemplate: "Order Reminder Template",
+            reminderPlaceholder:
+                "Reminder: Your order #{order_code} is scheduled for {datetime}.",
+            reminderHelp:
+                "Reminder message sent before order fulfillment. Use placeholders: {name}, {order_code}, {total}, {datetime}, {fulfillment}",
+            reminderHoursLabel: "Reminder Hours Before Order",
+            reminderHoursHelp:
+                "How many hours before the order fulfillment time should the reminder be sent? (Default: 24 hours)",
+        };
+    }
+    // Default: Restaurant labels
+    return {
+        formTemplate: "Booking Form Template",
+        formTemplatePlaceholder: "Enter your booking form template...",
+        formTemplateHelp:
+            "The template shown to customers when they want to make a booking. Leave empty to use the default template.",
+        confirmationTemplate: "Booking Confirmation Template",
+        confirmationPlaceholder:
+            "Your booking is confirmed! Date: {date}, Time: {time}, Pax: {pax}",
+        confirmationHelp:
+            "Message sent to customers after successful booking. Use placeholders: {name}, {date}, {time}, {pax}, {table}, {phone}",
+        reminderTemplate: "Booking Reminder Template",
+        reminderPlaceholder:
+            "Reminder: You have a booking tomorrow at {time} for {pax} people.",
+        reminderHelp:
+            "Reminder message sent before booking. Use placeholders: {name}, {date}, {time}, {pax}, {table}, {phone}",
+        reminderHoursLabel: "Reminder Hours Before Booking",
+        reminderHoursHelp:
+            "How many hours before the booking should the reminder be sent? (Default: 24 hours)",
+    };
+});
 
 // Merchant settings form
 const form = useForm({
@@ -88,24 +134,23 @@ const saveSettings = () => {
             </div>
         </div>
 
-        <!-- Row 2: Booking Form + Confirmation Template (Restaurant Only) -->
-        <div v-if="isRestaurant" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Booking Form Template -->
+        <!-- Row 2: Form Template + Confirmation Template -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Form Template -->
             <div>
                 <label
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                 >
-                    Booking Form Template
+                    {{ labels.formTemplate }}
                 </label>
                 <textarea
                     v-model="form.booking_form_template"
                     rows="6"
                     class="w-full px-4 py-2.5 rounded-xl border-0 bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-slate-600 focus:ring-2 focus:ring-primary-500 font-mono text-sm"
-                    placeholder="Enter your booking form template..."
+                    :placeholder="labels.formTemplatePlaceholder"
                 ></textarea>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    The template shown to customers when they want to make a
-                    booking. Leave empty to use the default template.
+                    {{ labels.formTemplateHelp }}
                 </p>
             </div>
 
@@ -114,40 +159,37 @@ const saveSettings = () => {
                 <label
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                 >
-                    Booking Confirmation Template
+                    {{ labels.confirmationTemplate }}
                 </label>
                 <textarea
                     v-model="form.confirmation_template"
                     rows="6"
                     class="w-full px-4 py-2.5 rounded-xl border-0 bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-slate-600 focus:ring-2 focus:ring-primary-500 font-mono text-sm"
-                    placeholder="Your booking is confirmed! Date: {date}, Time: {time}, Pax: {pax}"
+                    :placeholder="labels.confirmationPlaceholder"
                 ></textarea>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Message sent to customers after successful booking. Use
-                    placeholders: {name}, {date}, {time}, {pax}, {table},
-                    {phone}
+                    {{ labels.confirmationHelp }}
                 </p>
             </div>
         </div>
 
-        <!-- Row 3: Reminder Template + Reminder Hours (Restaurant Only) -->
-        <div v-if="isRestaurant" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Row 3: Reminder Template + Reminder Hours -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Reminder Template -->
             <div>
                 <label
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                 >
-                    Booking Reminder Template
+                    {{ labels.reminderTemplate }}
                 </label>
                 <textarea
                     v-model="form.reminder_template"
                     rows="4"
                     class="w-full px-4 py-2.5 rounded-xl border-0 bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-slate-600 focus:ring-2 focus:ring-primary-500 font-mono text-sm"
-                    placeholder="Reminder: You have a booking tomorrow at {time} for {pax} people."
+                    :placeholder="labels.reminderPlaceholder"
                 ></textarea>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Reminder message sent before booking. Use placeholders:
-                    {name}, {date}, {time}, {pax}, {table}, {phone}
+                    {{ labels.reminderHelp }}
                 </p>
             </div>
 
@@ -156,7 +198,7 @@ const saveSettings = () => {
                 <label
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
                 >
-                    Reminder Hours Before Booking
+                    {{ labels.reminderHoursLabel }}
                 </label>
                 <input
                     v-model.number="form.reminder_hours_before"
@@ -166,8 +208,7 @@ const saveSettings = () => {
                     class="w-full px-4 py-2.5 rounded-xl border-0 bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-slate-600 focus:ring-2 focus:ring-primary-500"
                 />
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    How many hours before the booking should the reminder be
-                    sent? (Default: 24 hours)
+                    {{ labels.reminderHoursHelp }}
                 </p>
             </div>
         </div>

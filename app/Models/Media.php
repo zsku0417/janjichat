@@ -22,12 +22,22 @@ class Media extends Model
         'file_size',
         'cloudinary_public_id',
         'metadata',
+        'mediable_id',
+        'mediable_type',
     ];
 
     protected $casts = [
         'file_size' => 'integer',
         'metadata' => 'array',
     ];
+
+    /**
+     * Get the parent mediable model (Product, etc.).
+     */
+    public function mediable()
+    {
+        return $this->morphTo();
+    }
 
     /**
      * Get the user who owns this media.

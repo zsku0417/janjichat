@@ -219,7 +219,7 @@ const openFile = (url) => {
                     :columns="columns"
                     :data="documents"
                     :searchable="true"
-                    search-placeholder="Search documents..."
+                    search-placeholder="Search by file name or type..."
                     :search-keys="['original_name', 'file_type']"
                     :paginated="true"
                     :per-page="10"

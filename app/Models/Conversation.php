@@ -44,6 +44,8 @@ class Conversation extends Model
     // Context types - Order Tracking
     const CONTEXT_ORDER_FLOW = 'order_flow';
     const CONTEXT_AWAITING_ORDER_CONFIRMATION = 'awaiting_order_confirmation';
+    const CONTEXT_ORDER_SELECTION = 'order_selection'; // When user must select from multiple orders
+    const CONTEXT_AWAITING_ORDER_CANCELLATION_CONFIRMATION = 'awaiting_order_cancellation_confirmation';
 
     /**
      * Get the merchant (user) who owns this conversation.

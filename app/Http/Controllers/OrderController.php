@@ -18,14 +18,42 @@ class OrderController extends Controller
         $filter = $request->get('filter', 'all');
 
         $query = auth()->user()->orders()
-            ->with('items')
-            ->orderBy('created_at', 'desc');
+            ->with('items');
 
+        // Status filter
         if ($filter !== 'all') {
             $query->where('status', $filter);
         }
 
-        $orders = $query->paginate(15);
+        // Search filter
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('customer_name', 'like', "%{$search}%")
+                    ->orWhere('customer_phone', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        // Date range filter (on requested_datetime)
+        if ($dateFrom = $request->input('date_from')) {
+            $query->whereDate('requested_datetime', '>=', $dateFrom);
+        }
+        if ($dateTo = $request->input('date_to')) {
+            $query->whereDate('requested_datetime', '<=', $dateTo);
+        }
+
+        // Sorting
+        $sortKey = $request->input('sort_key', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+
+        $allowedSortKeys = ['customer_name', 'fulfillment_type', 'requested_datetime', 'total_amount', 'status', 'created_at'];
+        if (in_array($sortKey, $allowedSortKeys)) {
+            $query->orderBy($sortKey, $sortOrder === 'asc' ? 'asc' : 'desc');
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
+
+        $orders = $query->paginate(15)->withQueryString();
 
         $stats = [
             'pending' => auth()->user()->orders()->where('status', 'pending_payment')->count(),
@@ -38,6 +66,13 @@ class OrderController extends Controller
             'orders' => $orders,
             'filter' => $filter,
             'stats' => $stats,
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'sort_key' => $request->input('sort_key'),
+                'sort_order' => $request->input('sort_order'),
+                'date_from' => $request->input('date_from'),
+                'date_to' => $request->input('date_to'),
+            ],
         ]);
     }
 
@@ -89,5 +124,20 @@ class OrderController extends Controller
 
         return redirect()->back()
             ->with('success', 'Order has been cancelled.');
+    }
+
+    /**
+     * Delete an order.
+     */
+    public function destroy(Order $order): RedirectResponse
+    {
+        $this->authorize('delete', $order);
+
+        // Delete order items first (cascade)
+        $order->items()->delete();
+        $order->delete();
+
+        return redirect()->route('orders.index')
+            ->with('success', 'Order has been deleted.');
     }
 }
