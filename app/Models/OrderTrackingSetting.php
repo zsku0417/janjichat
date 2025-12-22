@@ -15,7 +15,10 @@ class OrderTrackingSetting extends Model
         'pickup_address',
         'order_prefix',
         'payment_message',
+        'logo_media_id',
     ];
+
+    protected $appends = ['logo_url'];
 
     /**
      * Get the merchant (user) who owns this settings.
@@ -23,5 +26,21 @@ class OrderTrackingSetting extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the logo media.
+     */
+    public function logoMedia(): BelongsTo
+    {
+        return $this->belongsTo(Media::class, 'logo_media_id');
+    }
+
+    /**
+     * Get the logo URL.
+     */
+    public function getLogoUrlAttribute(): ?string
+    {
+        return $this->logoMedia?->url;
     }
 }

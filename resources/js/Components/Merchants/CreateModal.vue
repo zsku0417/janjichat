@@ -20,6 +20,7 @@ const form = useForm({
     password: "password123", // Default password
     business_type: "restaurant",
     whatsapp_phone_number_id: "",
+    whatsapp_phone_number: "",
     whatsapp_access_token: "",
 });
 
@@ -193,6 +194,25 @@ const submit = () => {
                                     :message="
                                         form.errors.whatsapp_phone_number_id
                                     "
+                                    class="mt-1"
+                                />
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                                >
+                                    WhatsApp Phone Number
+                                    <span class="text-red-500">*</span>
+                                </label>
+                                <input
+                                    v-model="form.whatsapp_phone_number"
+                                    type="text"
+                                    required
+                                    placeholder="e.g. 60123456789"
+                                    class="w-full px-4 py-2.5 rounded-xl border-0 bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-slate-600 focus:ring-2 focus:ring-primary-500"
+                                />
+                                <InputError
+                                    :message="form.errors.whatsapp_phone_number"
                                     class="mt-1"
                                 />
                             </div>

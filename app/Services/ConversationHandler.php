@@ -99,10 +99,8 @@ class ConversationHandler
             // Send greeting for first message in new conversation AFTER storing customer's message
             if ($isFirstMessage) {
                 $this->sendInitialGreeting($conversation);
-
-                // Mark as read and skip AI processing - greeting is sufficient for first message
-                $this->whatsApp->markAsRead($messageData['message_id']);
-                return;
+                // Continue processing - don't return early!
+                // The customer's first message may contain an order/booking request
             }
 
             // Check if conversation is in admin mode

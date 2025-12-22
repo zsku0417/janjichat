@@ -70,6 +70,7 @@ class AdminMerchantController extends Controller
                 'business_type_label' => User::getBusinessTypes()[$merchant->business_type] ?? 'Unknown',
                 'has_whatsapp' => $merchant->hasWhatsAppConfigured(),
                 'whatsapp_phone_number_id' => $merchant->whatsapp_phone_number_id,
+                'whatsapp_phone_number' => $merchant->whatsapp_phone_number,
                 'email_verified' => !is_null($merchant->email_verified_at),
                 'is_active' => $merchant->is_active ?? true,
                 'created_at' => $merchant->created_at->format('M j, Y'),
@@ -113,6 +114,7 @@ class AdminMerchantController extends Controller
             'password' => 'required|string|min:8',
             'business_type' => ['required', Rule::in(array_keys(User::getBusinessTypes()))],
             'whatsapp_phone_number_id' => 'required|string',
+            'whatsapp_phone_number' => 'required|string|max:20',
             'whatsapp_access_token' => 'required|string',
         ]);
 
@@ -126,6 +128,7 @@ class AdminMerchantController extends Controller
             'role' => User::ROLE_MERCHANT,
             'business_type' => $validated['business_type'],
             'whatsapp_phone_number_id' => $validated['whatsapp_phone_number_id'],
+            'whatsapp_phone_number' => $validated['whatsapp_phone_number'],
             'whatsapp_access_token' => $validated['whatsapp_access_token'],
             'email_verified_at' => null,
             'is_active' => true,
@@ -154,6 +157,7 @@ class AdminMerchantController extends Controller
             'email' => ['required', 'email', Rule::unique('users')->ignore($merchant->id)],
             'password' => 'nullable|string|min:8',
             'whatsapp_phone_number_id' => 'required|string',
+            'whatsapp_phone_number' => 'required|string|max:20',
             'whatsapp_access_token' => 'nullable|string',
         ]);
 
@@ -161,6 +165,7 @@ class AdminMerchantController extends Controller
         $merchant->name = $validated['name'];
         $merchant->email = $validated['email'];
         $merchant->whatsapp_phone_number_id = $validated['whatsapp_phone_number_id'];
+        $merchant->whatsapp_phone_number = $validated['whatsapp_phone_number'];
 
         if (!empty($validated['password'])) {
             $merchant->password = Hash::make($validated['password']);

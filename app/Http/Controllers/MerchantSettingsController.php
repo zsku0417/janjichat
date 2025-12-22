@@ -6,6 +6,7 @@ use App\Models\MerchantSetting;
 use App\Models\RestaurantSetting;
 use App\Models\OrderTrackingSetting;
 use App\Models\Table;
+use App\Services\MediaService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -88,6 +89,7 @@ class MerchantSettingsController extends Controller
                 'pickup_address' => $orderTrackingSetting->pickup_address,
                 'order_prefix' => $orderTrackingSetting->order_prefix,
                 'payment_message' => $orderTrackingSetting->payment_message,
+                'logo_url' => $orderTrackingSetting->logo_url,
             ];
         }
 
@@ -263,5 +265,64 @@ class MerchantSettingsController extends Controller
         $table->delete();
 
         return back()->with('success', 'Table deleted successfully!');
+    }
+
+    /**
+     * Upload merchant logo (order tracking only).
+     */
+    public function uploadLogo(Request $request, MediaService $mediaService): RedirectResponse
+    {
+        $user = auth()->user();
+
+        if ($user->business_type !== 'order_tracking') {
+            return back()->with('error', 'This action is only available for order tracking businesses.');
+        }
+
+        $request->validate([
+            'logo' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ]);
+
+        $setting = OrderTrackingSetting::firstOrCreate(
+            ['user_id' => $user->id],
+            ['order_prefix' => 'ORD']
+        );
+
+        // Delete existing logo if present
+        if ($setting->logoMedia) {
+            $mediaService->delete($setting->logoMedia);
+        }
+
+        // Upload new logo
+        $media = $mediaService->uploadImage(
+            $request->file('logo'),
+            $user->id,
+            'logos',
+            ['width' => 400, 'height' => 400, 'crop' => 'fit']
+        );
+
+        $setting->update(['logo_media_id' => $media->id]);
+
+        return back()->with('success', 'Logo uploaded successfully!');
+    }
+
+    /**
+     * Delete merchant logo (order tracking only).
+     */
+    public function deleteLogo(MediaService $mediaService): RedirectResponse
+    {
+        $user = auth()->user();
+
+        if ($user->business_type !== 'order_tracking') {
+            return back()->with('error', 'This action is only available for order tracking businesses.');
+        }
+
+        $setting = OrderTrackingSetting::where('user_id', $user->id)->first();
+
+        if ($setting && $setting->logoMedia) {
+            $mediaService->delete($setting->logoMedia);
+            $setting->update(['logo_media_id' => null]);
+        }
+
+        return back()->with('success', 'Logo deleted successfully!');
     }
 }

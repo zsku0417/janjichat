@@ -176,6 +176,24 @@ const formatDate = (date) => {
                                 <label
                                     class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"
                                 >
+                                    WhatsApp Phone Number
+                                </label>
+                                <p
+                                    class="text-sm text-gray-900 dark:text-white font-mono"
+                                >
+                                    {{
+                                        merchant.whatsapp_phone_number ||
+                                        "Not configured"
+                                    }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label
+                                    class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1"
+                                >
                                     WhatsApp Access Token
                                 </label>
                                 <p

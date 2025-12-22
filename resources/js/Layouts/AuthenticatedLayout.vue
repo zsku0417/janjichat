@@ -84,6 +84,12 @@ const navigationItems = computed(() => {
                 pattern: "admin.merchants.*",
                 icon: "users",
             },
+            {
+                name: "Knowledge Base",
+                route: "documents.index",
+                pattern: "documents.*",
+                icon: "book",
+            },
         ];
     }
 
@@ -143,10 +149,20 @@ const navigationItems = computed(() => {
             pattern: "settings.*",
             icon: "settings",
         },
+        {
+            name: "My Shop",
+            href: user.value?.id ? `/shop/${user.value.id}` : "#",
+            icon: "storefront",
+            external: true,
+        },
     ];
 });
 
 const isActive = (item) => {
+    // External links are never "active" in the same way
+    if (item.external || !item.route) {
+        return false;
+    }
     if (item.pattern) {
         return route().current(item.pattern);
     }
@@ -166,6 +182,8 @@ const getIcon = (iconName) => {
             "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
         orders: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
         users: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
+        storefront:
+            "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z",
     };
     return icons[iconName] || icons.home;
 };
@@ -196,7 +214,11 @@ const getIcon = (iconName) => {
                         class="w-10 h-10 min-w-[2.5rem] bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30"
                     >
                         <span class="text-white font-bold text-xl">{{
-                            businessType === "restaurant" ? "🍽️" : "📦"
+                            isAdmin
+                                ? "👑"
+                                : businessType === "restaurant"
+                                ? "🍽️"
+                                : "📦"
                         }}</span>
                     </div>
                     <span
@@ -215,41 +237,94 @@ const getIcon = (iconName) => {
             <nav
                 class="flex-1 px-3 py-4 space-y-1 overflow-y-auto overflow-x-hidden"
             >
-                <Link
+                <template
                     v-for="item in navigationItems"
-                    :key="item.route"
-                    :href="route(item.route)"
-                    :class="[
-                        'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
-                        isActive(item)
-                            ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
-                            : 'text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20',
-                    ]"
-                    :title="!isExpanded ? item.name : undefined"
+                    :key="item.route || item.name"
                 >
-                    <svg
-                        class="w-5 h-5 min-w-[1.25rem]"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            :d="getIcon(item.icon)"
-                        />
-                    </svg>
-                    <span
+                    <!-- External Link -->
+                    <a
+                        v-if="item.external"
+                        :href="item.href"
+                        target="_blank"
                         :class="[
-                            'whitespace-nowrap transition-all duration-300',
-                            isExpanded
-                                ? 'opacity-100 translate-x-0'
-                                : 'opacity-0 -translate-x-4 absolute',
+                            'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                            'text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-900/20',
                         ]"
-                        >{{ item.name }}</span
+                        :title="!isExpanded ? item.name : undefined"
                     >
-                </Link>
+                        <svg
+                            class="w-5 h-5 min-w-[1.25rem]"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                :d="getIcon(item.icon)"
+                            />
+                        </svg>
+                        <span
+                            :class="[
+                                'whitespace-nowrap transition-all duration-300 flex items-center gap-1',
+                                isExpanded
+                                    ? 'opacity-100 translate-x-0'
+                                    : 'opacity-0 -translate-x-4 absolute',
+                            ]"
+                        >
+                            {{ item.name }}
+                            <svg
+                                class="w-3 h-3"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                />
+                            </svg>
+                        </span>
+                    </a>
+                    <!-- Internal Link -->
+                    <Link
+                        v-else
+                        :href="route(item.route)"
+                        :class="[
+                            'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                            isActive(item)
+                                ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/30'
+                                : 'text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20',
+                        ]"
+                        :title="!isExpanded ? item.name : undefined"
+                    >
+                        <svg
+                            class="w-5 h-5 min-w-[1.25rem]"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                :d="getIcon(item.icon)"
+                            />
+                        </svg>
+                        <span
+                            :class="[
+                                'whitespace-nowrap transition-all duration-300',
+                                isExpanded
+                                    ? 'opacity-100 translate-x-0'
+                                    : 'opacity-0 -translate-x-4 absolute',
+                            ]"
+                            >{{ item.name }}</span
+                        >
+                    </Link>
+                </template>
 
                 <!-- Simulator (Dev only) -->
                 <Link
@@ -296,18 +371,22 @@ const getIcon = (iconName) => {
                     <ThemeToggle />
                 </div>
 
-                <!-- Business Type Badge -->
+                <!-- Role/Business Type Badge -->
                 <div
                     v-if="isExpanded"
                     :class="[
                         'flex items-center justify-center px-3 py-2 rounded-xl text-xs font-medium transition-all duration-300',
-                        businessType === 'restaurant'
+                        isAdmin
+                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                            : businessType === 'restaurant'
                             ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
                             : 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300',
                     ]"
                 >
                     {{
-                        businessType === "restaurant"
+                        isAdmin
+                            ? "👑 Admin"
+                            : businessType === "restaurant"
                             ? "🍽️ Restaurant"
                             : "📦 Order Tracking"
                     }}
@@ -412,7 +491,11 @@ const getIcon = (iconName) => {
                                 class="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30"
                             >
                                 <span class="text-white font-bold text-xl">{{
-                                    businessType === "restaurant" ? "🍽️" : "📦"
+                                    isAdmin
+                                        ? "👑"
+                                        : businessType === "restaurant"
+                                        ? "🍽️"
+                                        : "📦"
                                 }}</span>
                             </div>
                             <span class="text-xl font-bold text-gradient"
@@ -473,19 +556,46 @@ const getIcon = (iconName) => {
                 class="bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg border-t border-white/20 dark:border-white/10"
             >
                 <div class="space-y-1 pb-3 pt-2 px-4">
-                    <Link
+                    <template
                         v-for="item in navigationItems"
-                        :key="item.route"
-                        :href="route(item.route)"
-                        :class="[
-                            'block px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                            isActive(item)
-                                ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50',
-                        ]"
+                        :key="item.route || item.name"
                     >
-                        {{ item.name }}
-                    </Link>
+                        <!-- External Link -->
+                        <a
+                            v-if="item.external"
+                            :href="item.href"
+                            target="_blank"
+                            class="block px-4 py-2 rounded-lg text-sm font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/20"
+                        >
+                            {{ item.name }}
+                            <svg
+                                class="inline w-3 h-3 ml-1"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                />
+                            </svg>
+                        </a>
+                        <!-- Internal Link -->
+                        <Link
+                            v-else
+                            :href="route(item.route)"
+                            :class="[
+                                'block px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                                isActive(item)
+                                    ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50',
+                            ]"
+                        >
+                            {{ item.name }}
+                        </Link>
+                    </template>
                     <Link
                         :href="route('dev.simulator')"
                         class="block px-4 py-2 rounded-lg text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"

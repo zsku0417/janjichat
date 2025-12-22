@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\LandingChatController;
 use App\Http\Controllers\Api\WhatsAppWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,3 +21,6 @@ Route::prefix('webhook')->group(function () {
     // Incoming webhook events (POST request from Meta)
     Route::post('whatsapp', [WhatsAppWebhookController::class, 'handle']);
 });
+
+// Landing Page Chat (Public)
+Route::post('landing/chat', [LandingChatController::class, 'chat']);

@@ -9,6 +9,7 @@ use App\Http\Controllers\MerchantSettingsController;
 use App\Http\Controllers\DevelopmentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PublicProductController;
 use App\Http\Controllers\Admin\AdminMerchantController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -17,6 +18,9 @@ use Inertia\Inertia;
 Route::get('/', function () {
     return redirect()->route('login');
 });
+
+// Public shop page (white-label)
+Route::get('/shop/{merchant}', [PublicProductController::class, 'show'])->name('shop.show');
 
 // Authenticated routes
 Route::middleware(['auth', 'verified'])->group(function () {

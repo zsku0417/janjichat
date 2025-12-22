@@ -33,6 +33,7 @@ class User extends Authenticatable
         'role',
         'business_type',
         'whatsapp_phone_number_id',
+        'whatsapp_phone_number',
         'whatsapp_access_token',
         'email_verified',
         'is_active',
