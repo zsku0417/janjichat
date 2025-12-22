@@ -45,6 +45,7 @@ class PublicProductController extends Controller
                 'whatsapp_phone_number' => $merchant->whatsapp_phone_number,
                 'name' => $merchantSettings?->business_name ?? $merchant->name,
                 'logo_url' => $orderSettings?->logo_url,
+                'pickup_address' => $orderSettings?->pickup_address,
             ],
             'products' => $products,
         ]);
