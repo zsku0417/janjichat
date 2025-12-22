@@ -150,9 +150,7 @@ onUnmounted(() => {
                         "
                     >
                         Switch to
-                        {{
-                            conversationData.mode === "ai" ? "Admin" : "AI"
-                        }}
+                        {{ conversationData.mode === "ai" ? "Admin" : "AI" }}
                         Mode
                     </button>
                 </div>
@@ -222,8 +220,45 @@ onUnmounted(() => {
                                     'max-w-xs lg:max-w-md px-4 py-2 rounded-lg',
                                 ]"
                             >
-                                <p class="text-sm whitespace-pre-wrap">
+                                <!-- Image message -->
+                                <div
+                                    v-if="
+                                        message.message_type === 'image' &&
+                                        message.media_url
+                                    "
+                                    class="mb-2"
+                                >
+                                    <a
+                                        :href="message.media_url"
+                                        target="_blank"
+                                        class="block"
+                                    >
+                                        <img
+                                            :src="message.media_url"
+                                            alt="Shared image"
+                                            class="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                            style="
+                                                max-height: 300px;
+                                                object-fit: contain;
+                                            "
+                                        />
+                                    </a>
+                                </div>
+                                <!-- Text content or caption -->
+                                <p
+                                    v-if="
+                                        message.content &&
+                                        message.message_type !== 'image'
+                                    "
+                                    class="text-sm whitespace-pre-wrap"
+                                >
                                     {{ message.content }}
+                                </p>
+                                <p
+                                    v-else-if="message.message_type === 'image'"
+                                    class="text-sm text-gray-500 dark:text-gray-400 italic"
+                                >
+                                    📷 Image
                                 </p>
                                 <div
                                     class="mt-1 flex items-center justify-between"

@@ -3,6 +3,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import DataTable from "@/Components/DataTable.vue";
 import TableActionButton from "@/Components/TableActionButton.vue";
 import ViewOrderModal from "@/Components/Orders/ViewOrderModal.vue";
+import OrderFormModal from "@/Components/Orders/OrderFormModal.vue";
 import { Head, router } from "@inertiajs/vue3";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 
@@ -22,6 +23,10 @@ const props = defineProps({
             date_from: null,
             date_to: null,
         }),
+    },
+    products: {
+        type: Array,
+        default: () => [],
     },
 });
 
@@ -223,6 +228,29 @@ const handleOrderUpdated = () => {
     refreshData();
 };
 
+// Create/Edit Order Modal
+const showFormModal = ref(false);
+const editingOrder = ref(null);
+
+const openCreateModal = () => {
+    editingOrder.value = null;
+    showFormModal.value = true;
+};
+
+const openEditModal = (order) => {
+    editingOrder.value = order;
+    showFormModal.value = true;
+};
+
+const closeFormModal = () => {
+    showFormModal.value = false;
+    editingOrder.value = null;
+};
+
+const handleOrderSaved = () => {
+    refreshData();
+};
+
 // Delete functionality
 const showDeleteConfirm = ref(false);
 const orderToDelete = ref(null);
@@ -280,47 +308,58 @@ const getStatusLabel = (status) => {
 const statsCards = computed(() => [
     {
         key: "all",
-        label: "Total",
+        label: "Total Orders",
         value: props.stats?.total || 0,
-        color: "from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700",
-        textColor: "text-gray-900 dark:text-white",
-        borderColor:
-            props.filter === "all"
-                ? "ring-2 ring-primary-500 ring-offset-2"
-                : "",
+        icon: "📦",
+        gradient: "from-slate-500 to-slate-600",
+        bgColor: "bg-slate-50 dark:bg-slate-800/50",
+        iconBg: "bg-slate-100 dark:bg-slate-700",
+        textColor: "text-slate-700 dark:text-slate-200",
+        isActive: props.filter === "all",
     },
     {
         key: "pending_payment",
         label: "Pending",
         value: props.stats?.pending || 0,
-        color: "from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/30",
-        textColor: "text-amber-600 dark:text-amber-400",
-        borderColor:
-            props.filter === "pending_payment"
-                ? "ring-2 ring-amber-500 ring-offset-2"
-                : "",
+        icon: "⏳",
+        gradient: "from-amber-500 to-orange-500",
+        bgColor: "bg-amber-50 dark:bg-amber-900/20",
+        iconBg: "bg-amber-100 dark:bg-amber-900/40",
+        textColor: "text-amber-700 dark:text-amber-300",
+        isActive: props.filter === "pending_payment",
     },
     {
         key: "processing",
         label: "Processing",
         value: props.stats?.processing || 0,
-        color: "from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30",
-        textColor: "text-blue-600 dark:text-blue-400",
-        borderColor:
-            props.filter === "processing"
-                ? "ring-2 ring-blue-500 ring-offset-2"
-                : "",
+        icon: "⚡",
+        gradient: "from-blue-500 to-cyan-500",
+        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        iconBg: "bg-blue-100 dark:bg-blue-900/40",
+        textColor: "text-blue-700 dark:text-blue-300",
+        isActive: props.filter === "processing",
     },
     {
         key: "completed",
         label: "Completed",
         value: props.stats?.completed || 0,
-        color: "from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30",
-        textColor: "text-green-600 dark:text-green-400",
-        borderColor:
-            props.filter === "completed"
-                ? "ring-2 ring-green-500 ring-offset-2"
-                : "",
+        icon: "✅",
+        gradient: "from-green-500 to-emerald-500",
+        bgColor: "bg-green-50 dark:bg-green-900/20",
+        iconBg: "bg-green-100 dark:bg-green-900/40",
+        textColor: "text-green-700 dark:text-green-300",
+        isActive: props.filter === "completed",
+    },
+    {
+        key: "cancelled",
+        label: "Cancelled",
+        value: props.stats?.cancelled || 0,
+        icon: "❌",
+        gradient: "from-red-500 to-rose-500",
+        bgColor: "bg-red-50 dark:bg-red-900/20",
+        iconBg: "bg-red-100 dark:bg-red-900/40",
+        textColor: "text-red-700 dark:text-red-300",
+        isActive: props.filter === "cancelled",
     },
 ]);
 
@@ -421,41 +460,91 @@ const closeDatePicker = (e) => {
                         Manage customer orders
                     </p>
                 </div>
-                <div
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800"
+                <button
+                    @click="openCreateModal"
+                    class="px-5 py-2.5 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-xl font-medium shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all duration-200 flex items-center gap-2"
                 >
-                    <div
-                        class="w-2 h-2 bg-green-500 rounded-full animate-pulse"
-                    ></div>
-                    <span
-                        class="text-xs font-medium text-green-700 dark:text-green-300"
+                    <svg
+                        class="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                     >
-                        Live updates
-                    </span>
-                </div>
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 4v16m8-8H4"
+                        />
+                    </svg>
+                    Create Order
+                </button>
             </div>
         </template>
 
         <div class="py-8">
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <!-- Clickable Stats Cards -->
-                <div class="grid grid-cols-4 gap-4 mb-6">
+                <div
+                    class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6"
+                >
                     <button
                         v-for="card in statsCards"
                         :key="card.key"
                         @click="filterByStatus(card.key)"
                         :class="[
-                            'rounded-xl p-4 text-center transition-all hover:scale-105 cursor-pointer bg-gradient-to-br',
-                            card.color,
-                            card.borderColor,
+                            'relative group rounded-2xl p-4 sm:p-5 text-left transition-all duration-300 overflow-hidden border',
+                            card.bgColor,
+                            card.isActive
+                                ? 'border-2 border-primary-500 dark:border-primary-400 shadow-lg scale-[1.02]'
+                                : 'border-gray-100 dark:border-slate-700 hover:shadow-md hover:scale-[1.01]',
                         ]"
                     >
-                        <p :class="['text-2xl font-bold', card.textColor]">
-                            {{ card.value }}
-                        </p>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                            {{ card.label }}
-                        </p>
+                        <!-- Decorative gradient bar -->
+                        <div
+                            :class="[
+                                'absolute top-0 left-0 right-0 h-1 bg-gradient-to-r',
+                                card.gradient,
+                                card.isActive
+                                    ? 'opacity-100'
+                                    : 'opacity-0 group-hover:opacity-50',
+                            ]"
+                        ></div>
+
+                        <div class="flex items-center gap-3">
+                            <!-- Icon -->
+                            <div
+                                :class="[
+                                    'w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-lg sm:text-xl flex-shrink-0 transition-transform group-hover:scale-110',
+                                    card.iconBg,
+                                ]"
+                            >
+                                {{ card.icon }}
+                            </div>
+
+                            <!-- Content -->
+                            <div class="min-w-0">
+                                <p
+                                    :class="[
+                                        'text-2xl sm:text-3xl font-bold leading-none',
+                                        card.textColor,
+                                    ]"
+                                >
+                                    {{ card.value }}
+                                </p>
+                                <p
+                                    class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 truncate"
+                                >
+                                    {{ card.label }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Active indicator -->
+                        <div
+                            v-if="card.isActive"
+                            class="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-primary-500 animate-pulse"
+                        ></div>
                     </button>
                 </div>
 
@@ -681,6 +770,10 @@ const closeDatePicker = (e) => {
                                 @click="openViewModal(row)"
                             />
                             <TableActionButton
+                                type="edit"
+                                @click="openEditModal(row)"
+                            />
+                            <TableActionButton
                                 type="delete"
                                 @click="confirmDelete(row)"
                             />
@@ -696,6 +789,15 @@ const closeDatePicker = (e) => {
             :order="viewingOrder"
             @close="closeViewModal"
             @updated="handleOrderUpdated"
+        />
+
+        <!-- Create/Edit Order Modal -->
+        <OrderFormModal
+            :show="showFormModal"
+            :order="editingOrder"
+            :products="products"
+            @close="closeFormModal"
+            @saved="handleOrderSaved"
         />
 
         <!-- Delete Confirmation Modal -->

@@ -19,6 +19,7 @@ class Message extends Model
         'whatsapp_message_id',
         'status',
         'metadata',
+        'media_url',
     ];
 
     protected $casts = [

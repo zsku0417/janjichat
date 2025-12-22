@@ -324,4 +324,87 @@ class WhatsAppService
             return false;
         }
     }
+
+    /**
+     * Download media from WhatsApp using media ID.
+     * Returns the binary content of the media file.
+     *
+     * @param string $mediaId The WhatsApp media ID
+     * @return array|null ['content' => binary, 'mime_type' => string, 'filename' => string] or null on failure
+     */
+    public function downloadMedia(string $mediaId): ?array
+    {
+        try {
+            // Step 1: Get media URL from WhatsApp
+            $mediaUrl = "{$this->baseUrl}/{$this->apiVersion}/{$mediaId}";
+
+            $response = Http::withToken($this->accessToken)
+                ->timeout(30)
+                ->get($mediaUrl);
+
+            if ($response->failed()) {
+                Log::error('Failed to get WhatsApp media URL', [
+                    'media_id' => $mediaId,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+
+            $mediaInfo = $response->json();
+            $downloadUrl = $mediaInfo['url'] ?? null;
+            $mimeType = $mediaInfo['mime_type'] ?? 'application/octet-stream';
+
+            if (!$downloadUrl) {
+                Log::error('No download URL in WhatsApp media response', ['media_info' => $mediaInfo]);
+                return null;
+            }
+
+            // Step 2: Download the actual media file
+            $downloadResponse = Http::withToken($this->accessToken)
+                ->timeout(60)
+                ->get($downloadUrl);
+
+            if ($downloadResponse->failed()) {
+                Log::error('Failed to download WhatsApp media', [
+                    'media_id' => $mediaId,
+                    'status' => $downloadResponse->status(),
+                ]);
+                return null;
+            }
+
+            // Determine filename from mime type
+            $extension = match (true) {
+                str_contains($mimeType, 'jpeg') || str_contains($mimeType, 'jpg') => 'jpg',
+                str_contains($mimeType, 'png') => 'png',
+                str_contains($mimeType, 'gif') => 'gif',
+                str_contains($mimeType, 'webp') => 'webp',
+                str_contains($mimeType, 'pdf') => 'pdf',
+                str_contains($mimeType, 'audio') => 'ogg',
+                str_contains($mimeType, 'video') => 'mp4',
+                default => 'bin',
+            };
+
+            $filename = "whatsapp_{$mediaId}.{$extension}";
+
+            Log::info('WhatsApp media downloaded successfully', [
+                'media_id' => $mediaId,
+                'mime_type' => $mimeType,
+                'size' => strlen($downloadResponse->body()),
+            ]);
+
+            return [
+                'content' => $downloadResponse->body(),
+                'mime_type' => $mimeType,
+                'filename' => $filename,
+            ];
+
+        } catch (Exception $e) {
+            Log::error('Exception downloading WhatsApp media', [
+                'media_id' => $mediaId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
 }

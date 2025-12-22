@@ -61,6 +61,7 @@ const updateStatus = (newStatus) => {
             preserveScroll: true,
             onSuccess: () => {
                 emit("updated");
+                emit("close");
             },
         }
     );

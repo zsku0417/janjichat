@@ -77,12 +77,21 @@ Customer message:
 
 Extract the following information from the message. Return a JSON object with these fields:
 - products: array of {name: string, quantity: number} - match to available products or use the name customer provided
-- datetime: string in "YYYY-MM-DD HH:mm" format (convert relative dates like "tomorrow" to actual dates, current date is today)
-- delivery_address: string or null (null if empty/blank or pickup)
+- datetime: string in "YYYY-MM-DD HH:mm" format (convert relative dates like "tomorrow 3pm" to actual dates) OR null if NOT explicitly provided by customer
+- fulfillment_type: "pickup" or "delivery" OR null if NOT explicitly stated by customer
+- delivery_address: string or null (required if fulfillment_type is "delivery", null for pickup)
 - special_notes: string or null
-- is_valid: boolean - true if all required fields (products, datetime) are present
+- is_valid: boolean - ONLY true if customer explicitly provided ALL required fields: products, datetime, AND fulfillment_type
+- missing_fields: array of strings - list any required fields that are missing (e.g., ["datetime", "fulfillment_type"])
+- reason: string - explanation if is_valid is false
 
-If you can't parse the message as an order, return: {"is_valid": false, "reason": "explanation"}
+IMPORTANT VALIDATION RULES:
+1. "Products" is required - there must be at least one product mentioned
+2. "Datetime" is required - customer must specify when they need the order (e.g., "tomorrow 3pm", "25 Dec 2pm", "today evening")
+3. "Fulfillment_type" is required - customer must say "pickup", "self collect", "delivery", "deliver to", etc.
+4. If fulfillment_type is "delivery", delivery_address is also required
+5. If ANY required field is missing, set is_valid to false and list the missing fields
+6. Do NOT assume or default any values - only extract what customer explicitly stated
 
 Current date/time: {now}
 
@@ -111,6 +120,27 @@ PROMPT;
                 return null;
             }
 
+            // Additional validation: ensure required fields are not null for valid orders
+            if ($parsed['is_valid'] ?? false) {
+                $missingFields = [];
+
+                if (empty($parsed['datetime'])) {
+                    $missingFields[] = 'datetime';
+                }
+                if (empty($parsed['fulfillment_type'])) {
+                    $missingFields[] = 'fulfillment_type';
+                }
+                if ($parsed['fulfillment_type'] === 'delivery' && empty($parsed['delivery_address'])) {
+                    $missingFields[] = 'delivery_address';
+                }
+
+                if (!empty($missingFields)) {
+                    $parsed['is_valid'] = false;
+                    $parsed['missing_fields'] = array_merge($parsed['missing_fields'] ?? [], $missingFields);
+                    $parsed['reason'] = 'Please provide: ' . implode(', ', $missingFields);
+                }
+            }
+
             return $parsed;
         } catch (Exception $e) {
             Log::error('Failed to parse order with AI', [
@@ -127,13 +157,13 @@ PROMPT;
     {
         try {
             return DB::transaction(function () use ($orderData, $merchant, $conversation) {
-                // Determine fulfillment type
-                $fulfillmentType = !empty($orderData['delivery_address']) ? 'delivery' : 'pickup';
+                // Use the parsed fulfillment type (already validated)
+                $fulfillmentType = $orderData['fulfillment_type'] ?? 'pickup';
 
-                // Parse datetime
+                // Parse datetime (already validated as present)
                 $requestedDatetime = $this->parseDateTime($orderData['datetime'] ?? '');
                 if (!$requestedDatetime) {
-                    $requestedDatetime = now()->addDay(); // Default to tomorrow
+                    throw new Exception('Invalid datetime provided');
                 }
 
                 // Generate unique order code for this merchant
@@ -246,7 +276,7 @@ PROMPT;
             $replacements = [
                 '{name}' => $order->customer_name,
                 '{order_code}' => $order->code,
-                '{total}' => 'RM' . $order->formatted_total,
+                '{total}' => 'RM ' . number_format((float) $order->total_amount, 2),
                 '{items}' => $itemsList,
                 '{datetime}' => $order->requested_datetime?->format('d M Y, g:i A') ?? 'TBD',
                 '{fulfillment}' => $fulfillment,
@@ -258,6 +288,7 @@ PROMPT;
         }
 
         // Default template
+        $formattedTotal = number_format((float) $order->total_amount, 2);
         return <<<MESSAGE
 ✅ *Order Confirmed!*
 
@@ -266,7 +297,7 @@ Order #{$order->code}
 *Items:*
 {$itemsList}
 
-💰 *Total: RM{$order->formatted_total}*
+💰 *Total: RM {$formattedTotal}*
 
 📅 *Requested Time:* {$order->requested_datetime->format('d M Y, g:i A')}
 {$fulfillment}{$notes}
@@ -583,6 +614,7 @@ PROMPT;
         }
 
         // Default template
+        $formattedTotal = number_format((float) $order->total_amount, 2);
         return <<<MESSAGE
 ⏰ *Order Reminder*
 
@@ -597,9 +629,100 @@ Order #{$order->code}
 *Items:*
 {$itemsList}
 
-💰 *Total: RM{$order->formatted_total}*
+💰 *Total: RM {$formattedTotal}*
 
 See you soon! 🙏
 MESSAGE;
     }
+
+    /**
+     * Generate payment message based on order status and previous total.
+     * 
+     * Scenarios:
+     * - New order (pending_payment): Show full amount to pay
+     * - Modified order (pending_payment): Show updated amount to pay
+     * - Modified order (processing, increased): Show additional amount to pay
+     * - Modified order (processing, decreased): Show refund notice
+     */
+    public function getPaymentMessage(Order $order, ?float $previousTotal = null): ?string
+    {
+        $order->load('user.orderTrackingSetting');
+
+        $setting = $order->user?->orderTrackingSetting;
+        $paymentTemplate = $setting?->payment_message;
+
+        // If no payment message configured, return null
+        if (empty($paymentTemplate)) {
+            return null;
+        }
+
+        $currentTotal = (float) $order->total_amount;
+        $formattedCurrent = number_format($currentTotal, 2);
+
+        // Determine the scenario and amount to show
+        if ($order->status === 'pending_payment') {
+            // New order or modified pending order - show full amount
+            $message = $this->buildPaymentMessage($paymentTemplate, $formattedCurrent, 'pay');
+            return $message;
+        }
+
+        if ($order->status === 'processing' && $previousTotal !== null) {
+            $difference = $currentTotal - $previousTotal;
+
+            if ($difference > 0) {
+                // Customer needs to pay additional amount
+                $formattedDiff = number_format($difference, 2);
+                return $this->buildPaymentMessage($paymentTemplate, $formattedDiff, 'additional', $previousTotal, $currentTotal);
+            } elseif ($difference < 0) {
+                // Customer will receive refund
+                $formattedRefund = number_format(abs($difference), 2);
+                return $this->buildRefundMessage($formattedRefund, $previousTotal, $currentTotal);
+            }
+            // No change in amount - no payment message needed
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Build the payment message with template replacement.
+     */
+    protected function buildPaymentMessage(string $template, string $amount, string $type = 'pay', ?float $oldTotal = null, ?float $newTotal = null): string
+    {
+        // Replace {amount} placeholder
+        $message = str_replace('{amount}', $amount, $template);
+
+        $header = match ($type) {
+            'additional' => "💳 *Additional Payment Required*\n\nYour order total has increased from RM " . number_format($oldTotal, 2) . " to RM " . number_format($newTotal, 2) . ".\n\n",
+            default => "💳 *Payment Instructions*\n\n",
+        };
+
+        $footer = match ($type) {
+            'additional' => "\n\n💰 *Additional amount to pay: RM {$amount}*\n\nPlease complete payment and we'll update your order! 🙏",
+            default => "\n\n💰 *Amount to pay: RM {$amount}*\n\nPlease complete payment and we'll process your order! 🙏",
+        };
+
+        return $header . $message . $footer;
+    }
+
+    /**
+     * Build refund message for order modifications that decrease total.
+     */
+    protected function buildRefundMessage(string $refundAmount, float $oldTotal, float $newTotal): string
+    {
+        $formattedOld = number_format($oldTotal, 2);
+        $formattedNew = number_format($newTotal, 2);
+
+        return <<<MESSAGE
+💳 *Payment Update*
+
+Your order total has been reduced from RM {$formattedOld} to RM {$formattedNew}.
+
+💰 *Refund amount: RM {$refundAmount}*
+
+Our team will process your refund shortly. Thank you for your patience! 🙏
+MESSAGE;
+    }
 }
+

@@ -178,4 +178,98 @@ class OpenAIService
         // Rough estimate: ~4 characters per token for English
         return (int) ceil(strlen($text) / 4);
     }
+
+    /**
+     * Analyze an image using GPT-4 Vision to determine if it's a payment proof.
+     *
+     * @param string $imageUrl The URL of the image to analyze
+     * @return array ['is_payment_proof' => bool, 'confidence' => float, 'description' => string]
+     */
+    public function analyzePaymentProof(string $imageUrl): array
+    {
+        try {
+            $response = Http::withToken($this->apiKey)
+                ->timeout(60)
+                ->post('https://api.openai.com/v1/chat/completions', [
+                    'model' => 'gpt-4o-mini', // Vision-capable model
+                    'messages' => [
+                        [
+                            'role' => 'system',
+                            'content' => 'You are an image analysis assistant. Analyze images and determine if they are payment receipts, bank transfer screenshots, or transaction proofs. Be strict: only mark as payment proof if it clearly shows transaction details like amount, date, reference number, bank name, or recipient details.'
+                        ],
+                        [
+                            'role' => 'user',
+                            'content' => [
+                                [
+                                    'type' => 'text',
+                                    'text' => 'Analyze this image. Is it a payment receipt, bank transfer screenshot, or transaction proof? Return JSON: {"is_payment_proof": true/false, "confidence": 0.0-1.0, "description": "brief description of what you see"}'
+                                ],
+                                [
+                                    'type' => 'image_url',
+                                    'image_url' => [
+                                        'url' => $imageUrl,
+                                        'detail' => 'low' // Use low detail to reduce cost
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ],
+                    'max_tokens' => 200,
+                    'temperature' => 0.2,
+                ]);
+
+            if ($response->failed()) {
+                Log::error('OpenAI Vision API failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                // Default to not a payment proof on error
+                return [
+                    'is_payment_proof' => false,
+                    'confidence' => 0,
+                    'description' => 'Failed to analyze image',
+                ];
+            }
+
+            $data = $response->json();
+            $content = $data['choices'][0]['message']['content'] ?? '';
+
+            // Try to parse JSON from response
+            $content = preg_replace('/```json\s*/', '', $content);
+            $content = preg_replace('/```\s*/', '', $content);
+            $content = trim($content);
+
+            $parsed = json_decode($content, true);
+
+            if (!$parsed) {
+                Log::warning('Could not parse Vision API response', ['content' => $content]);
+                return [
+                    'is_payment_proof' => false,
+                    'confidence' => 0,
+                    'description' => 'Could not parse analysis result',
+                ];
+            }
+
+            Log::info('Payment proof analysis complete', [
+                'is_payment_proof' => $parsed['is_payment_proof'] ?? false,
+                'confidence' => $parsed['confidence'] ?? 0,
+            ]);
+
+            return [
+                'is_payment_proof' => $parsed['is_payment_proof'] ?? false,
+                'confidence' => (float) ($parsed['confidence'] ?? 0),
+                'description' => $parsed['description'] ?? '',
+            ];
+
+        } catch (Exception $e) {
+            Log::error('Exception in Vision API analysis', [
+                'error' => $e->getMessage(),
+            ]);
+            return [
+                'is_payment_proof' => false,
+                'confidence' => 0,
+                'description' => 'Error analyzing image',
+            ];
+        }
+    }
 }

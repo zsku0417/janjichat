@@ -87,6 +87,7 @@ class MerchantSettingsController extends Controller
             $data['orderTrackingSettings'] = [
                 'pickup_address' => $orderTrackingSetting->pickup_address,
                 'order_prefix' => $orderTrackingSetting->order_prefix,
+                'payment_message' => $orderTrackingSetting->payment_message,
             ];
         }
 
@@ -159,6 +160,7 @@ class MerchantSettingsController extends Controller
         $validated = $request->validate([
             'pickup_address' => 'nullable|string|max:500',
             'order_prefix' => 'required|string|max:10',
+            'payment_message' => 'nullable|string|max:2000',
         ]);
 
         OrderTrackingSetting::updateOrCreate(

@@ -351,6 +351,7 @@ class UsersSeeder extends Seeder
             [
                 'pickup_address' => '173, Jalan Paya 3/1, Kampung Paya, 86000 Kluang, Johor, Malaysia',
                 'order_prefix' => 'JQP',
+                'payment_message' => "Please transfer to:\n\nBank: Maybank\nAccount Name: J.Q Patisserie Sdn Bhd\nAccount Number: 5123 4567 8901\n\nAfter payment, please send your payment screenshot here. Thank you! 🙏",
             ]
         );
 

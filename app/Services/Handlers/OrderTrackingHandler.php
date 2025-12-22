@@ -69,13 +69,7 @@ class OrderTrackingHandler implements BusinessHandlerInterface
             'merchant_id' => $merchant->id,
         ]);
 
-        // Check if this looks like a filled order form
-        if ($this->order->isOrderAttempt($content)) {
-            $this->handleOrderAttempt($conversation, $content, $merchant);
-            return;
-        }
-
-        // Detect intent with full conversation context
+        // INTENT-FIRST: Always detect intent first to properly distinguish modifications from new orders
         $intentResult = $this->rag->detectIntent($content, $conversation, 'order_tracking');
         $intent = $intentResult['intent'];
         $entities = $intentResult['entities'];
@@ -86,6 +80,14 @@ class OrderTrackingHandler implements BusinessHandlerInterface
             'entities' => $entities,
         ]);
 
+        // Only process as a new order if:
+        // 1. Intent is specifically 'order_request' (not modify)
+        // 2. Message looks like a filled order form
+        if ($intent === 'order_request' && $this->order->isOrderAttempt($content)) {
+            $this->handleOrderAttempt($conversation, $content, $merchant);
+            return;
+        }
+
         // Handle based on intent
         switch ($intent) {
             case 'greeting':
@@ -94,7 +96,7 @@ class OrderTrackingHandler implements BusinessHandlerInterface
                 break;
 
             case 'order_request':
-                // Show order form for order requests
+                // Show order form for order requests (but not filled forms - those handled above)
                 $this->handleGreeting($conversation, $merchant);
                 break;
 
@@ -266,15 +268,18 @@ class OrderTrackingHandler implements BusinessHandlerInterface
 
         if (!$parsedOrder || !($parsedOrder['is_valid'] ?? false)) {
             $reason = $parsedOrder['reason'] ?? 'Could not parse order details.';
+            $missingFields = $parsedOrder['missing_fields'] ?? [];
 
             // Let AI generate a helpful response
             $response = $this->rag->generateContextualResponse(
                 'order_request',
                 $content,
                 [
-                    'action_result' => "Order parsing failed: {$reason}",
-                    'action_needed' => 'Explain what was missing and offer to show the order form again',
+                    'action_result' => "Order incomplete: {$reason}",
+                    'missing_fields' => $missingFields,
+                    'action_needed' => 'Ask the customer for the missing information. Do NOT create the order yet.',
                     'business_name' => $merchant->merchantSettings?->business_name ?? $merchant->name,
+                    'products_found' => !empty($parsedOrder['products']),
                 ],
                 $conversation,
                 'order_tracking'
@@ -297,6 +302,12 @@ class OrderTrackingHandler implements BusinessHandlerInterface
             // Send confirmation
             $confirmation = $this->order->getOrderConfirmationMessage($order);
             $this->sendResponse($conversation, $confirmation);
+
+            // Send payment message if configured
+            $paymentMessage = $this->order->getPaymentMessage($order);
+            if ($paymentMessage) {
+                $this->sendResponse($conversation, $paymentMessage);
+            }
 
             // Clear the order context
             $conversation->clearContext();
@@ -478,13 +489,16 @@ class OrderTrackingHandler implements BusinessHandlerInterface
         // If customer provided new details, try to modify
         if (!empty($newDetails)) {
             try {
+                // Store previous total for payment calculations
+                $previousTotal = (float) $order->total_amount;
+
                 $updatedOrder = $this->order->modifyOrder($order, $newDetails);
 
                 $updatedData = [
                     'id' => $updatedOrder->id,
                     'status' => $updatedOrder->status_label,
                     'items' => $updatedOrder->items->map(fn($i) => "{$i->product_name} x{$i->quantity}")->implode(', '),
-                    'total' => 'RM' . number_format((float) $updatedOrder->total_amount, 2),
+                    'total' => 'RM ' . number_format((float) $updatedOrder->total_amount, 2),
                     'datetime' => $updatedOrder->requested_datetime?->format('d M Y, g:i A'),
                     'fulfillment' => $updatedOrder->fulfillment_type,
                 ];
@@ -500,6 +514,13 @@ class OrderTrackingHandler implements BusinessHandlerInterface
                     'order_tracking'
                 );
                 $this->sendResponse($conversation, $response);
+
+                // Send payment message if applicable (price changed)
+                $paymentMessage = $this->order->getPaymentMessage($updatedOrder, $previousTotal);
+                if ($paymentMessage) {
+                    $this->sendResponse($conversation, $paymentMessage);
+                }
+
                 return;
 
             } catch (Exception $e) {

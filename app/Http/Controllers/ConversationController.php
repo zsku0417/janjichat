@@ -89,6 +89,7 @@ class ConversationController extends Controller
                     'message_type' => $message->message_type,
                     'content' => $message->content,
                     'status' => $message->status,
+                    'media_url' => $message->media_url,
                     'created_at' => $message->created_at->format('M j, g:i A'),
                 ];
             });
@@ -123,6 +124,7 @@ class ConversationController extends Controller
                     'message_type' => $message->message_type,
                     'content' => $message->content,
                     'status' => $message->status,
+                    'media_url' => $message->media_url,
                     'created_at' => $message->created_at->format('M j, g:i A'),
                 ];
             });

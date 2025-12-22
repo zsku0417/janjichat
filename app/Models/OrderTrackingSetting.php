@@ -14,6 +14,7 @@ class OrderTrackingSetting extends Model
         'user_id',
         'pickup_address',
         'order_prefix',
+        'payment_message',
     ];
 
     /**

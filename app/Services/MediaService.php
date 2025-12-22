@@ -99,6 +99,81 @@ class MediaService
     }
 
     /**
+     * Upload an image from binary data to Cloudinary.
+     * Used for WhatsApp media files.
+     *
+     * @param string $binaryData The raw image data
+     * @param string $filename Original filename or generated name
+     * @param string $mimeType The MIME type of the image
+     * @param string $folder Cloudinary folder
+     * @return string|null The Cloudinary secure URL or null on failure
+     */
+    public function uploadImageFromBinary(
+        string $binaryData,
+        string $filename,
+        string $mimeType,
+        string $folder = 'whatsapp-media'
+    ): ?string {
+        try {
+            // Save binary data to a temp file first
+            $tempPath = storage_path('app/temp/' . $filename);
+
+            // Ensure temp directory exists
+            if (!is_dir(dirname($tempPath))) {
+                mkdir(dirname($tempPath), 0755, true);
+            }
+
+            file_put_contents($tempPath, $binaryData);
+
+            $extension = pathinfo($filename, PATHINFO_EXTENSION);
+            $publicId = time() . '_' . pathinfo($filename, PATHINFO_FILENAME);
+
+            // Upload to Cloudinary
+            $uploadResult = cloudinary()->uploadApi()->upload(
+                $tempPath,
+                [
+                    'folder' => $folder,
+                    'public_id' => $publicId,
+                    'resource_type' => 'image',
+                    'type' => 'upload',
+                    'access_mode' => 'public',
+                ]
+            );
+
+            // Clean up temp file
+            if (file_exists($tempPath)) {
+                unlink($tempPath);
+            }
+
+            if (!$uploadResult) {
+                Log::error('Cloudinary upload from binary returned null');
+                return null;
+            }
+
+            $secureUrl = $uploadResult['secure_url'] ?? null;
+
+            Log::info('WhatsApp media uploaded to Cloudinary', [
+                'filename' => $filename,
+                'secure_url' => $secureUrl,
+            ]);
+
+            return $secureUrl;
+
+        } catch (\Exception $e) {
+            // Clean up temp file on error
+            if (isset($tempPath) && file_exists($tempPath)) {
+                unlink($tempPath);
+            }
+
+            Log::error('Failed to upload binary image to Cloudinary', [
+                'filename' => $filename,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
      * Upload a document (PDF, DOCX, TXT, etc.) to Cloudinary.
      *
      * @param UploadedFile $file

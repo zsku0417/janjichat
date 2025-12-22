@@ -221,6 +221,13 @@ class ConversationHandler
      */
     protected function storeMessage(Conversation $conversation, array $messageData): Message
     {
+        $mediaUrl = null;
+
+        // For image messages, download from WhatsApp and upload to Cloudinary
+        if ($messageData['message_type'] === 'image') {
+            $mediaUrl = $this->processAndUploadMedia($messageData);
+        }
+
         $message = Message::create([
             'conversation_id' => $conversation->id,
             'direction' => 'inbound',
@@ -230,6 +237,7 @@ class ConversationHandler
             'whatsapp_message_id' => $messageData['message_id'],
             'status' => 'delivered',
             'metadata' => $messageData['metadata'],
+            'media_url' => $mediaUrl,
         ]);
 
         // Broadcast new message event for real-time frontend updates
@@ -239,18 +247,130 @@ class ConversationHandler
     }
 
     /**
+     * Process media from WhatsApp and upload to Cloudinary.
+     * Returns the Cloudinary URL or null on failure.
+     */
+    protected function processAndUploadMedia(array $messageData): ?string
+    {
+        try {
+            $mediaId = $messageData['metadata']['media_id'] ?? null;
+            if (!$mediaId) {
+                Log::warning('No media_id in message metadata');
+                return null;
+            }
+
+            // Download from WhatsApp
+            $mediaData = $this->whatsApp->downloadMedia($mediaId);
+            if (!$mediaData) {
+                Log::warning('Failed to download media from WhatsApp', ['media_id' => $mediaId]);
+                return null;
+            }
+
+            // Upload to Cloudinary using MediaService
+            $mediaService = app(MediaService::class);
+            $cloudinaryUrl = $mediaService->uploadImageFromBinary(
+                $mediaData['content'],
+                $mediaData['filename'],
+                $mediaData['mime_type']
+            );
+
+            return $cloudinaryUrl;
+
+        } catch (Exception $e) {
+            Log::error('Failed to process and upload media', [
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
      * Handle non-text messages (images, audio, etc.).
+     * Business-specific logic:
+     * - Restaurant: Escalate all images to admin
+     * - Order Tracking: AI analyzes if it's a payment proof
      */
     protected function handleNonTextMessage(Conversation $conversation, array $messageData): void
     {
-        // Escalate to admin for non-text messages
-        $reason = "Customer sent a {$messageData['message_type']} message which cannot be processed automatically.";
+        $merchant = $this->getMerchantForConversation($conversation);
+        $messageType = $messageData['message_type'];
 
-        $conversation->escalateToAdmin($reason);
+        // Only process images for now
+        if ($messageType !== 'image') {
+            $this->escalateNonTextMessage($conversation, $messageType, 'Other media types not supported');
+            return;
+        }
+
+        // Get the uploaded media URL from the message we just stored
+        $message = $conversation->messages()->latest()->first();
+        $mediaUrl = $message?->media_url;
+
+        // Restaurant: Always escalate images
+        if (!$merchant || !$merchant->isOrderTracking()) {
+            $this->escalateNonTextMessage($conversation, $messageType, 'Restaurant business type');
+            return;
+        }
+
+        // Order Tracking: Analyze if image is a payment proof
+        if (!$mediaUrl) {
+            Log::warning('No media URL for image analysis');
+            $this->escalateNonTextMessage($conversation, $messageType, 'Could not upload image');
+            return;
+        }
+
+        try {
+            // Use AI Vision to analyze the image
+            $analysis = $this->openAI->analyzePaymentProof($mediaUrl);
+
+            Log::info('Payment proof analysis result', [
+                'conversation_id' => $conversation->id,
+                'is_payment_proof' => $analysis['is_payment_proof'],
+                'confidence' => $analysis['confidence'],
+            ]);
+
+            if ($analysis['is_payment_proof'] && $analysis['confidence'] >= 0.6) {
+                // It's likely a payment proof - acknowledge and notify admin will verify
+                $response = "Thank you for sending your payment screenshot! 📸\n\n" .
+                    "Our team will verify it shortly and update your order status.\n\n" .
+                    "Please wait for confirmation. We'll get back to you soon! 🙏";
+
+                $this->sendResponse($conversation, $response);
+
+                // Still escalate to admin for manual verification, but with different reason
+                $conversation->escalateToAdmin('Payment proof received - needs verification');
+
+                Log::info('Payment proof acknowledged', [
+                    'conversation_id' => $conversation->id,
+                    'confidence' => $analysis['confidence'],
+                ]);
+            } else {
+                // Not a payment proof - escalate to admin
+                $reason = "Customer sent an image that doesn't appear to be payment proof. AI analysis: " . ($analysis['description'] ?? 'Unknown content');
+                $this->escalateNonTextMessage($conversation, $messageType, $reason);
+            }
+
+        } catch (Exception $e) {
+            Log::error('Payment proof analysis failed', [
+                'conversation_id' => $conversation->id,
+                'error' => $e->getMessage(),
+            ]);
+            // On error, escalate to admin
+            $this->escalateNonTextMessage($conversation, $messageType, 'AI analysis failed');
+        }
+    }
+
+    /**
+     * Escalate a non-text message to admin.
+     */
+    protected function escalateNonTextMessage(Conversation $conversation, string $messageType, string $reason): void
+    {
+        $fullReason = "Customer sent a {$messageType} message. Reason: {$reason}";
+        $conversation->escalateToAdmin($fullReason);
 
         Log::info('Non-text message escalated to admin', [
             'conversation_id' => $conversation->id,
-            'message_type' => $messageData['message_type'],
+            'message_type' => $messageType,
+            'reason' => $reason,
         ]);
     }
 
