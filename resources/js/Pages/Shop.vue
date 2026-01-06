@@ -213,7 +213,13 @@ const getWhatsappUrl = (phone, text = "") => {
 </script>
 
 <template>
-    <Head :title="`${merchant.name} - Shop`" />
+    <Head :title="`${merchant.name} - Shop`">
+        <link
+            rel="icon"
+            :href="merchant.logo_url || '/favicon.ico'"
+            type="image/x-icon"
+        />
+    </Head>
 
     <div
         class="min-h-screen bg-slate-50 font-sans selection:bg-primary-500 selection:text-white pb-24 sm:pb-0"

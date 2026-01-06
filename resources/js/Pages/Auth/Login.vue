@@ -31,7 +31,7 @@ const demoAccounts = [
         password: "password",
     },
     {
-        label: "🏦 Shop",
+        label: "🏦 E-commerce",
         email: "shop@example.com",
         password: "password",
     },

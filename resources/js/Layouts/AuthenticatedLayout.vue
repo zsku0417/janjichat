@@ -382,7 +382,7 @@ const getIcon = (iconName) => {
                             ? "👑 Admin"
                             : businessType === "restaurant"
                             ? "🍽️ Restaurant"
-                            : "📦 Order Tracking"
+                            : "🏦 E-commerce"
                     }}
                 </div>
 

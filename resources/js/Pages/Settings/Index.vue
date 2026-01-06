@@ -37,7 +37,7 @@ const tabs = computed(() => {
     }
 
     if (isOrderTracking.value) {
-        baseTabs.push({ key: "order-tracking", label: "Order Tracking" });
+        baseTabs.push({ key: "order-tracking", label: "E-commerce" });
     }
 
     return baseTabs;

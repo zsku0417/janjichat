@@ -243,7 +243,7 @@ Or scan QR code..."
                 {{
                     form.processing
                         ? "Saving..."
-                        : "Save Order Tracking Settings"
+                        : "Save E-commerce Settings"
                 }}
             </button>
         </div>

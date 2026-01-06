@@ -97,7 +97,7 @@ class User extends Authenticatable
     {
         return [
             self::BUSINESS_RESTAURANT => 'Restaurant Booking',
-            self::BUSINESS_ORDER_TRACKING => 'Order Tracking',
+            self::BUSINESS_ORDER_TRACKING => 'E-commerce',
         ];
     }
 

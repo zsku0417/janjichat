@@ -1,7 +1,7 @@
 <script setup>
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import { Head, Link, router } from "@inertiajs/vue3";
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 
 const props = defineProps({
     stats: Object,
@@ -12,9 +12,32 @@ const props = defineProps({
 const statsData = ref(props.stats);
 const recentConversationsData = ref(props.recentConversations);
 const upcomingBookingsData = ref(props.upcomingBookings);
-let pollInterval = null;
+
+// Loading state
+const isRefreshing = ref(false);
+
+// Auto-refresh countdown (60 seconds)
+const countdown = ref(60);
+let countdownInterval = null;
+
+const startCountdown = () => {
+    countdown.value = 60;
+
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+
+    countdownInterval = setInterval(() => {
+        countdown.value--;
+
+        if (countdown.value <= 0) {
+            refreshData();
+        }
+    }, 1000);
+};
 
 const refreshData = () => {
+    isRefreshing.value = true;
     router.reload({
         only: ["stats", "recentConversations", "upcomingBookings"],
         preserveState: true,
@@ -24,18 +47,33 @@ const refreshData = () => {
             recentConversationsData.value = page.props.recentConversations;
             upcomingBookingsData.value = page.props.upcomingBookings;
         },
+        onFinish: () => {
+            isRefreshing.value = false;
+            startCountdown();
+        },
     });
 };
 
-// Start polling when component mounts
-onMounted(() => {
-    pollInterval = setInterval(refreshData, 10000); // Refresh every 10 seconds
+const formatCountdown = computed(() => {
+    const mins = Math.floor(countdown.value / 60);
+    const secs = countdown.value % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
 });
 
-// Stop polling when component unmounts
+// Progress bar percentage
+const progressPercentage = computed(() => {
+    return ((60 - countdown.value) / 60) * 100;
+});
+
+// Start countdown when component mounts
+onMounted(() => {
+    startCountdown();
+});
+
+// Stop countdown when component unmounts
 onUnmounted(() => {
-    if (pollInterval) {
-        clearInterval(pollInterval);
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
     }
 });
 </script>
@@ -52,16 +90,45 @@ onUnmounted(() => {
                         Welcome back! Here's your restaurant overview.
                     </p>
                 </div>
-                <div
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800"
-                >
-                    <div
-                        class="w-2 h-2 bg-success-500 rounded-full animate-pulse"
-                    ></div>
-                    <span
-                        class="text-xs font-medium text-success-700 dark:text-success-400"
-                        >Live updates</span
+                <div class="flex items-center gap-3">
+                    <div class="flex flex-col items-end">
+                        <div
+                            class="text-sm text-gray-500 dark:text-gray-400 mb-1"
+                        >
+                            Auto-refresh:
+                            <span class="font-mono font-medium">{{
+                                formatCountdown
+                            }}</span>
+                        </div>
+                        <div
+                            class="w-32 h-1 bg-gray-200 dark:bg-slate-600 rounded-full overflow-hidden"
+                        >
+                            <div
+                                class="h-full bg-gradient-to-r from-primary-500 to-secondary-500 transition-all duration-1000"
+                                :style="{ width: progressPercentage + '%' }"
+                            ></div>
+                        </div>
+                    </div>
+                    <button
+                        @click="refreshData"
+                        :disabled="isRefreshing"
+                        class="px-4 py-2 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl ring-1 ring-inset ring-gray-200 dark:ring-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-2 disabled:opacity-50"
                     >
+                        <svg
+                            :class="['w-4 h-4', isRefreshing && 'animate-spin']"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            />
+                        </svg>
+                        {{ isRefreshing ? "Refreshing..." : "Refresh" }}
+                    </button>
                 </div>
             </div>
         </template>

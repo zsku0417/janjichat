@@ -217,6 +217,12 @@ class ConversationHandler
             ]);
         }
 
+        Log::info('Merchant found', [
+            'merchant_id' => $merchant->id,
+            'merchant_name' => $merchant->name ?? null,
+            'phone_number_id' => $phoneNumberId,
+        ]);
+
         return $merchant;
     }
 
