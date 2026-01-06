@@ -37,6 +37,15 @@ class ConversationController extends Controller
             $query->where('user_id', $user->id);
         }
 
+        // Search by phone number or customer name
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('phone_number', 'like', "%{$search}%")
+                    ->orWhere('customer_name', 'like', "%{$search}%");
+            });
+        }
+
         // Filter by status
         if ($request->has('filter')) {
             match ($request->filter) {
@@ -69,6 +78,7 @@ class ConversationController extends Controller
         return Inertia::render('Conversations/Index', [
             'conversations' => $conversations,
             'filter' => $request->filter ?? 'all',
+            'search' => $request->search ?? '',
             'selected' => $request->selected ?? null,
         ]);
     }

@@ -210,17 +210,11 @@ const getIcon = (iconName) => {
                     :href="route('dashboard')"
                     class="flex items-center gap-3 overflow-hidden"
                 >
-                    <div
-                        class="w-10 h-10 min-w-[2.5rem] bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30"
-                    >
-                        <span class="text-white font-bold text-xl">{{
-                            isAdmin
-                                ? "👑"
-                                : businessType === "restaurant"
-                                ? "🍽️"
-                                : "📦"
-                        }}</span>
-                    </div>
+                    <img
+                        src="/images/Logo-Icon.png"
+                        alt="Janji Chat Logo"
+                        class="w-10 h-10 min-w-[2.5rem] rounded-xl shadow-lg shadow-primary-500/30 object-contain"
+                    />
                     <span
                         :class="[
                             'text-xl font-bold text-gradient whitespace-nowrap transition-all duration-300',
@@ -327,7 +321,7 @@ const getIcon = (iconName) => {
                 </template>
 
                 <!-- Simulator (Dev only) -->
-                <Link
+                <!-- <Link
                     :href="route('dev.simulator')"
                     :class="[
                         'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
@@ -349,7 +343,7 @@ const getIcon = (iconName) => {
                         ]"
                         >Simulator</span
                     >
-                </Link>
+                </Link> -->
             </nav>
 
             <!-- Bottom Section -->
@@ -487,17 +481,11 @@ const getIcon = (iconName) => {
                             :href="route('dashboard')"
                             class="flex items-center space-x-2"
                         >
-                            <div
-                                class="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/30"
-                            >
-                                <span class="text-white font-bold text-xl">{{
-                                    isAdmin
-                                        ? "👑"
-                                        : businessType === "restaurant"
-                                        ? "🍽️"
-                                        : "📦"
-                                }}</span>
-                            </div>
+                            <img
+                                src="/images/Logo-Icon.png"
+                                alt="Janji Chat Logo"
+                                class="w-10 h-10 rounded-xl shadow-lg shadow-primary-500/30 object-contain"
+                            />
                             <span class="text-xl font-bold text-gradient"
                                 >Janji Chat</span
                             >

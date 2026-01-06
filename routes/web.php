@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    return redirect()->route('login');
-});
+    return Inertia::render('Landing');
+})->name('landing');
 
 // Public shop page (white-label)
 Route::get('/shop/{merchant}', [PublicProductController::class, 'show'])->name('shop.show');

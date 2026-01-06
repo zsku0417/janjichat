@@ -113,7 +113,7 @@ class ConversationHandler
 
             // Check if it's a non-text message
             if ($messageData['message_type'] !== 'text') {
-                $this->handleNonTextMessage($conversation, $messageData);
+                $this->handleNonTextMessage($conversation, $messageData, $message);
                 // Mark as read after handling non-text message
                 $this->whatsApp->markAsRead($messageData['message_id']);
                 return;
@@ -153,18 +153,14 @@ class ConversationHandler
             $merchant = User::where('role', User::ROLE_MERCHANT)->first();
         }
 
-        // Look for existing conversation for this customer + merchant
-        $conversation = Conversation::where('whatsapp_id', $messageData['from'])
-            ->where(function ($query) use ($merchant) {
-                // Match by user_id if set, or where user_id is null (old conversations)
-                $query->where('user_id', $merchant?->id)
-                    ->orWhereNull('user_id');
-            })
-            ->first();
+        // FIRST: Check if any conversation with this whatsapp_id exists (regardless of merchant)
+        // This prevents duplicate key violations
+        $conversation = Conversation::where('whatsapp_id', $messageData['from'])->first();
 
         $isNew = false;
 
         if (!$conversation) {
+            // No conversation exists, create a new one
             $conversation = Conversation::create([
                 'user_id' => $merchant?->id,
                 'whatsapp_id' => $messageData['from'],
@@ -183,7 +179,7 @@ class ConversationHandler
                 'merchant_id' => $merchant?->id,
             ]);
         } else {
-            // Update user_id for old conversations that don't have it
+            // Conversation exists - update merchant association if needed
             if (!$conversation->user_id && $merchant) {
                 $conversation->update(['user_id' => $merchant->id]);
                 Log::info('Updated conversation with merchant user_id', [
@@ -192,6 +188,7 @@ class ConversationHandler
                 ]);
             }
 
+            // Update customer name if we have it now but didn't before
             if ($messageData['contact_name'] && !$conversation->customer_name) {
                 $conversation->update(['customer_name' => $messageData['contact_name']]);
             }
@@ -206,12 +203,21 @@ class ConversationHandler
     protected function findMerchantByPhoneNumberId(?string $phoneNumberId): ?User
     {
         if (!$phoneNumberId) {
+            Log::warning('Phone number ID is null when finding merchant');
             return null;
         }
 
-        return User::where('role', User::ROLE_MERCHANT)
+        $merchant = User::where('role', User::ROLE_MERCHANT)
             ->where('whatsapp_phone_number_id', $phoneNumberId)
             ->first();
+
+        if (!$merchant) {
+            Log::warning('No merchant found for phone_number_id', [
+                'phone_number_id' => $phoneNumberId,
+            ]);
+        }
+
+        return $merchant;
     }
 
     /**
@@ -287,8 +293,12 @@ class ConversationHandler
      * Business-specific logic:
      * - Restaurant: Escalate all images to admin
      * - Order Tracking: AI analyzes if it's a payment proof
+     *
+     * @param Conversation $conversation
+     * @param array $messageData
+     * @param Message $message The already-stored message with media_url
      */
-    protected function handleNonTextMessage(Conversation $conversation, array $messageData): void
+    protected function handleNonTextMessage(Conversation $conversation, array $messageData, Message $message): void
     {
         $merchant = $this->getMerchantForConversation($conversation);
         $messageType = $messageData['message_type'];
@@ -299,9 +309,8 @@ class ConversationHandler
             return;
         }
 
-        // Get the uploaded media URL from the message we just stored
-        $message = $conversation->messages()->latest()->first();
-        $mediaUrl = $message?->media_url;
+        // Use the media URL from the message that was just stored
+        $mediaUrl = $message->media_url;
 
         // Restaurant: Always escalate images
         if (!$merchant || !$merchant->isOrderTracking()) {

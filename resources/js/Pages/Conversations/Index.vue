@@ -6,6 +6,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 const props = defineProps({
     conversations: Object,
     filter: String,
+    search: String,
     selected: [String, Number], // From URL ?selected=ID
     selectedConversation: Object,
     messages: Array,
@@ -14,6 +15,7 @@ const props = defineProps({
 // Store all conversations (unfiltered)
 const allConversations = ref(props.conversations?.data || []);
 const currentFilter = ref(props.filter || "all");
+const searchQuery = ref(props.search || "");
 const isLoading = ref(false);
 const isLoadingChat = ref(false);
 
@@ -301,17 +303,28 @@ const closeEmojiPicker = () => {
 const filteredConversations = computed(() => {
     if (!allConversations.value) return [];
 
+    let result = allConversations.value;
+
+    // Filter by search query (phone number or customer name)
+    if (searchQuery.value.trim()) {
+        const query = searchQuery.value.toLowerCase().trim();
+        result = result.filter((c) => {
+            const name = (c.customer_name || "").toLowerCase();
+            const phone = (c.phone_number || "").toLowerCase();
+            return name.includes(query) || phone.includes(query);
+        });
+    }
+
+    // Filter by status
     switch (currentFilter.value) {
         case "needs_reply":
-            return allConversations.value.filter((c) => c.needs_reply);
+            return result.filter((c) => c.needs_reply);
         case "ai_mode":
-            return allConversations.value.filter(
-                (c) => c.mode === "ai" && !c.needs_reply
-            );
+            return result.filter((c) => c.mode === "ai" && !c.needs_reply);
         case "admin_mode":
-            return allConversations.value.filter((c) => c.mode === "admin");
+            return result.filter((c) => c.mode === "admin");
         default:
-            return allConversations.value;
+            return result;
     }
 });
 
@@ -643,9 +656,55 @@ const closeMobileChat = () => {
                             showMobileChat ? 'hidden lg:flex' : 'flex',
                         ]"
                     >
-                        <!-- Filter Tabs -->
+                        <!-- Search Bar -->
                         <div
                             class="p-4 border-b border-white/20 dark:border-white/10"
+                        >
+                            <div class="relative">
+                                <svg
+                                    class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                    />
+                                </svg>
+                                <input
+                                    v-model="searchQuery"
+                                    type="text"
+                                    placeholder="Search by name or phone..."
+                                    class="w-full pl-10 pr-10 py-2.5 text-sm rounded-xl bg-white/50 dark:bg-slate-700/50 border border-white/30 dark:border-white/10 text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                                />
+                                <button
+                                    v-if="searchQuery"
+                                    @click="searchQuery = ''"
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                >
+                                    <svg
+                                        class="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12"
+                                        />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filter Tabs -->
+                        <div
+                            class="px-4 pb-4 border-b border-white/20 dark:border-white/10"
                         >
                             <div class="flex flex-wrap gap-2">
                                 <button
@@ -1157,7 +1216,35 @@ const closeMobileChat = () => {
                                                 : 'bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-tr-md',
                                         ]"
                                     >
+                                        <!-- Image Message -->
                                         <div
+                                            v-if="
+                                                message.message_type ===
+                                                    'image' && message.media_url
+                                            "
+                                            class="mb-2"
+                                        >
+                                            <a
+                                                :href="message.media_url"
+                                                target="_blank"
+                                                class="block"
+                                            >
+                                                <img
+                                                    :src="message.media_url"
+                                                    alt="Image"
+                                                    class="max-w-full max-h-72 object-contain rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                                />
+                                            </a>
+                                        </div>
+                                        <!-- Text Content (hide "[Image received]" if we have the actual image) -->
+                                        <div
+                                            v-if="
+                                                !(
+                                                    message.message_type ===
+                                                        'image' &&
+                                                    message.media_url
+                                                )
+                                            "
                                             class="text-sm whitespace-pre-wrap leading-relaxed formatted-message"
                                             v-html="
                                                 formatWhatsAppText(

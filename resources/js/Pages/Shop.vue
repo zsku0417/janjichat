@@ -171,12 +171,9 @@ const checkout = () => {
     // Items
     message += `*Items:*\n`;
     cart.value.forEach((item) => {
-        message += `${item.quantity}x ${item.name} (${formatPrice(
-            item.price * item.quantity
-        )})\n`;
+        message += `${item.quantity}x ${item.name}\n`;
     });
 
-    message += `\n*Total: ${formatPrice(cartTotal.value)}*\n`;
     message += `------------------\n`;
 
     // Order Details

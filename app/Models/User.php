@@ -61,7 +61,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'email_verified' => 'boolean',
-            'whatsapp_phone_number_id' => 'encrypted',
+            // Note: whatsapp_phone_number_id is NOT encrypted so it can be queried
             'whatsapp_access_token' => 'encrypted',
         ];
     }
