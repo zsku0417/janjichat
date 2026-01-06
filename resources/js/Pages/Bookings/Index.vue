@@ -596,7 +596,7 @@ const hasActiveFilters = computed(() => {
         />
 
         <!-- Cancel Booking Modal -->
-        <BaseModal
+        <DeleteModal
             :show="showCancelModal"
             title="Cancel Booking"
             :message="`Are you sure you want to cancel the booking for ${bookingToCancel?.customer_name}? The customer will be notified.`"

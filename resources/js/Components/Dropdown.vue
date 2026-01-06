@@ -14,6 +14,10 @@ const props = defineProps({
         type: String,
         default: "py-1 bg-white dark:bg-gray-700",
     },
+    direction: {
+        type: String,
+        default: "down", // 'down' or 'up'
+    },
 });
 
 const closeOnEscape = (e) => {
@@ -39,6 +43,13 @@ const alignmentClasses = computed(() => {
     } else {
         return "origin-top";
     }
+});
+
+const directionClasses = computed(() => {
+    if (props.direction === "up") {
+        return "bottom-full mb-2";
+    }
+    return "top-full mt-2";
 });
 
 const open = ref(false);
@@ -67,8 +78,8 @@ const open = ref(false);
         >
             <div
                 v-show="open"
-                class="absolute z-50 mt-2 rounded-md shadow-lg"
-                :class="[widthClass, alignmentClasses]"
+                class="absolute z-50 rounded-md shadow-lg"
+                :class="[widthClass, alignmentClasses, directionClasses]"
                 style="display: none"
                 @click="open = false"
             >

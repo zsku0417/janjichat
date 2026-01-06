@@ -321,7 +321,7 @@ const getIcon = (iconName) => {
                 </template>
 
                 <!-- Simulator (Dev only) -->
-                <!-- <Link
+                <Link
                     :href="route('dev.simulator')"
                     :class="[
                         'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
@@ -343,12 +343,12 @@ const getIcon = (iconName) => {
                         ]"
                         >Simulator</span
                     >
-                </Link> -->
+                </Link>
             </nav>
 
             <!-- Bottom Section -->
             <div
-                class="border-t border-white/20 dark:border-white/10 p-3 space-y-2"
+                class="border-t border-white/20 dark:border-white/10 p-3 space-y-2 overflow-visible"
             >
                 <!-- Theme Toggle -->
                 <div
@@ -387,7 +387,7 @@ const getIcon = (iconName) => {
                 </div>
 
                 <!-- User Profile -->
-                <Dropdown align="right" width="48">
+                <Dropdown align="right" width="48" direction="up">
                     <template #trigger>
                         <button
                             type="button"
