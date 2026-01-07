@@ -179,9 +179,15 @@ class ConversationController extends Controller
     public function toggleMode(Conversation $conversation): RedirectResponse
     {
         if ($conversation->isAiMode()) {
+            // Check if the last message was from the customer (inbound)
+            // Only mark as needs_reply if customer is waiting for a response
+            // Note: reorder() clears the default 'asc' ordering from the messages() relationship
+            $lastMessage = $conversation->messages()->reorder()->latest('created_at')->first();
+            $needsReply = $lastMessage && $lastMessage->direction === 'inbound';
+            
             $conversation->update([
                 'mode' => 'admin',
-                'needs_reply' => true,
+                'needs_reply' => $needsReply,
             ]);
         } else {
             $conversation->switchToAiMode();
