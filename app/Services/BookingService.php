@@ -99,10 +99,17 @@ You are parsing a customer table reservation message for a restaurant.
 
 Restaurant operating hours: {$openingTime} - {$closingTime}
 
-IMPORTANT DATE CONTEXT:
-- Today is {$currentDayOfWeek}, {$currentDate}
+CRITICAL DATE CONTEXT:
+- TODAY is {$currentDayOfWeek}, {$currentDate}
 - Current date/time: {$currentDateTime}
-- Use this to calculate relative dates (e.g., "tomorrow", "next Tuesday", "this weekend")
+- Current year: {$currentYear}
+
+RELATIVE DATE TRANSLATIONS (calculate based on today's date above):
+- English: tomorrow, day after tomorrow, next week, this weekend
+- Chinese: 明天 (tomorrow), 后天 (day after tomorrow), 下周/下星期 (next week), 这个周末 (this weekend), 今天 (today)
+- Malay: esok (tomorrow), lusa (day after tomorrow), minggu depan (next week)
+
+EXAMPLE: If today is 2026-01-07 and customer says "明天12pm", the datetime should be "2026-01-08 12:00"
 {$conversationContext}
 Customer's LATEST message (this is what they sent NOW):
 ---
@@ -113,11 +120,12 @@ Extract the following information. IMPORTANT: If information is not in the lates
 
 Return a JSON object with these fields:
 - pax: number (number of guests) - check previous messages if not in latest
-- datetime: string in "YYYY-MM-DD HH:mm" format - check previous messages if only correcting the date
+- datetime: string in "YYYY-MM-DD HH:mm" format - CALCULATE CORRECTLY based on today's date above
 - phone: string (phone number, use default if not provided)
 - name: string (customer name, use default if not provided)  
 - special_request: string or null - check previous messages if not in latest
 - is_valid: boolean - true if required fields (pax, datetime) can be determined from latest or previous messages
+- language: string - the language code of the customer's message (e.g., "en", "zh", "ms")
 
 If pax or datetime cannot be extracted from latest OR previous messages, return: {"is_valid": false, "reason": "explanation"}
 
@@ -126,6 +134,7 @@ Default name if not provided: {$customerName}
 
 IMPORTANT: 
 - Return ONLY valid JSON, no markdown, no explanation.
+- CALCULATE dates correctly: 明天 = tomorrow = today + 1 day
 - Make sure the year is correct (currently we are in year {$currentYear}).
 - If customer is correcting/updating information from a previous message, merge the old and new info.
 PROMPT;
@@ -291,23 +300,53 @@ PROMPT;
         // Count how many booking-related data points are present
         $score = 0;
 
-        // Has pax/guests mentioned
-        if (preg_match('/\b\d+\s*(pax|guests?|people|persons?|orang|tetamu|位)/i', $message)) {
+        // Has pax/guests mentioned (multilingual)
+        // English: 4 pax, 4 guests, 4 people
+        // Malay: 4 orang, 4 tetamu
+        // Chinese: 4个人, 4位, 四个人
+        if (
+            preg_match('/\b\d+\s*(pax|guests?|people|persons?|orang|tetamu)/i', $message) ||
+            preg_match('/\d+\s*(个人|位|個人)/', $message)
+        ) {
             $score += 2;
         }
 
-        // Has date pattern (various formats)
-        if (preg_match('/\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\b(tomorrow|esok|minggu depan|next\s+\w+day)/i', $message)) {
+        // Has date pattern (various formats and languages)
+        // Format: 15/12/2026, 15-12-2026
+        // English: tomorrow, next Monday
+        // Malay: esok, minggu depan
+        // Chinese: 明天, 后天, 今天, 下周
+        if (
+            preg_match('/\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\b(tomorrow|esok|minggu depan|next\s+\w+day)/i', $message) ||
+            preg_match('/(明天|后天|今天|下周|下星期|這個週末|这个周末)/', $message)
+        ) {
             $score += 2;
         }
 
-        // Has time pattern
-        if (preg_match('/\d{1,2}(:\d{2})?\s*(am|pm|pagi|petang|malam)/i', $message)) {
+        // Has time pattern (multilingual)
+        // English: 12pm, 7:00pm
+        // Malay: 12 petang, 7 malam
+        // Chinese: 12点, 12時, 中午12点
+        if (
+            preg_match('/\d{1,2}(:\d{2})?\s*(am|pm|pagi|petang|malam)/i', $message) ||
+            preg_match('/\d{1,2}\s*(点|點|時|时)/', $message)
+        ) {
             $score += 1;
         }
 
-        // Has name/phone indicators
-        if (preg_match('/\b(name|nama|phone|telefon|contact)\s*[:=]/i', $message)) {
+        // Has name/phone indicators (multilingual)
+        // English: name:, phone:
+        // Malay: nama:, telefon:
+        // Chinese: 名字, 电话, 電話
+        if (
+            preg_match('/\b(name|nama|phone|telefon|contact)\s*[:=]/i', $message) ||
+            preg_match('/(名字|电话|電話|名字放|电话放|電話放)/', $message)
+        ) {
+            $score += 1;
+        }
+
+        // Has phone number pattern (6+ digits together)
+        if (preg_match('/\d{8,}/', $message) || preg_match('/\d{3,4}[-\s]?\d{3,4}[-\s]?\d{3,4}/', $message)) {
             $score += 1;
         }
 

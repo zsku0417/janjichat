@@ -7,7 +7,7 @@ import DeleteModal from "@/Components/DeleteModal.vue";
 import ViewBookingModal from "@/Components/Bookings/ViewBookingModal.vue";
 import EditBookingModal from "@/Components/Bookings/EditBookingModal.vue";
 import { Head, useForm, router } from "@inertiajs/vue3";
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 
 const props = defineProps({
     bookings: Object,
@@ -256,6 +256,59 @@ const hasActiveFilters = computed(() => {
         props.filters.search
     );
 });
+
+// Auto-refresh functionality
+const isRefreshing = ref(false);
+const countdown = ref(60);
+let countdownInterval = null;
+
+const startCountdown = () => {
+    countdown.value = 60;
+
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+
+    countdownInterval = setInterval(() => {
+        countdown.value--;
+
+        if (countdown.value <= 0) {
+            refreshData();
+        }
+    }, 1000);
+};
+
+const refreshData = () => {
+    isRefreshing.value = true;
+    router.reload({
+        preserveState: true,
+        preserveScroll: true,
+        onFinish: () => {
+            isRefreshing.value = false;
+            startCountdown();
+        },
+    });
+};
+
+const formatCountdown = computed(() => {
+    const mins = Math.floor(countdown.value / 60);
+    const secs = countdown.value % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+});
+
+const progressPercentage = computed(() => {
+    return ((60 - countdown.value) / 60) * 100;
+});
+
+onMounted(() => {
+    startCountdown();
+});
+
+onUnmounted(() => {
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+});
 </script>
 
 <template>
@@ -270,25 +323,65 @@ const hasActiveFilters = computed(() => {
                         Manage your restaurant reservations
                     </p>
                 </div>
-                <button
-                    @click="showCreateModal = true"
-                    class="px-5 py-2.5 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-xl font-medium shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all duration-200 flex items-center gap-2"
-                >
-                    <svg
-                        class="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+                <div class="flex items-center gap-3">
+                    <div class="flex flex-col items-end">
+                        <div
+                            class="text-sm text-gray-500 dark:text-gray-400 mb-1"
+                        >
+                            Auto-refresh:
+                            <span class="font-mono font-medium">{{
+                                formatCountdown
+                            }}</span>
+                        </div>
+                        <div
+                            class="w-32 h-1 bg-gray-200 dark:bg-slate-600 rounded-full overflow-hidden"
+                        >
+                            <div
+                                class="h-full bg-gradient-to-r from-primary-500 to-secondary-500 transition-all duration-1000"
+                                :style="{ width: progressPercentage + '%' }"
+                            ></div>
+                        </div>
+                    </div>
+                    <button
+                        @click="refreshData"
+                        :disabled="isRefreshing"
+                        class="px-4 py-2 bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl ring-1 ring-inset ring-gray-200 dark:ring-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-2 disabled:opacity-50"
                     >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 4v16m8-8H4"
-                        />
-                    </svg>
-                    New Booking
-                </button>
+                        <svg
+                            :class="['w-4 h-4', isRefreshing && 'animate-spin']"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            />
+                        </svg>
+                        {{ isRefreshing ? "Refreshing..." : "Refresh" }}
+                    </button>
+                    <button
+                        @click="showCreateModal = true"
+                        class="px-5 py-2.5 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-xl font-medium shadow-lg shadow-primary-500/30 hover:shadow-primary-500/50 transition-all duration-200 flex items-center gap-2"
+                    >
+                        <svg
+                            class="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M12 4v16m8-8H4"
+                            />
+                        </svg>
+                        New Booking
+                    </button>
+                </div>
             </div>
         </template>
 

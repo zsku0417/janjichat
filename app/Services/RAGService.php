@@ -391,9 +391,22 @@ PROMPT;
         // Get business-specific intent configuration
         $config = $this->getIntentConfig($businessType);
 
+        // Get current date context for relative date parsing
+        $currentDate = now()->format('Y-m-d');
+        $currentDayOfWeek = now()->format('l');
+        $tomorrowDate = now()->addDay()->format('Y-m-d');
+
         return <<<PROMPT
 You are an intelligent AI assistant analyzing customer messages for a {$config['businessLabel']} chatbot.
 Your job is to understand the FULL CONTEXT of the conversation and determine the customer's true intent.
+
+CRITICAL DATE CONTEXT (for parsing relative dates):
+- TODAY is {$currentDayOfWeek}, {$currentDate}
+- TOMORROW is {$tomorrowDate}
+- Relative date translations:
+  - English: tomorrow, day after tomorrow, next week
+  - Chinese: 明天 (tomorrow), 后天 (day after tomorrow), 今天 (today), 下周 (next week)
+  - Malay: esok (tomorrow), lusa (day after tomorrow), minggu depan (next week)
 
 {$historyContext}
 
@@ -405,6 +418,18 @@ Based on the conversation history and current message, determine the customer's 
 IMPORTANT CONTEXT RULES:
 {$config['contextRules']}
 - Be smart about understanding follow-up messages in the context of the conversation
+
+ENTITY EXTRACTION RULES (CRITICAL):
+- Extract entities in ANY language (English, Chinese, Malay)
+- For DATE: Convert ALL relative dates to YYYY-MM-DD format using today's date above
+  - Example: If today is 2026-01-07 and message has 明天, date = "2026-01-08"
+  - Example: If message has "tomorrow", date = "{$tomorrowDate}"
+- For TIME: Extract in HH:MM 24-hour format
+  - Example: "12pm" → "12:00", "7:30pm" → "19:30", "12点" → "12:00"
+- For PAX: Extract the number of guests
+  - Example: "4个人" → 4, "four guests" → 4, "4位" → 4
+- For NAME: Extract customer name from any language
+- For PHONE: Extract phone number
 
 Respond in JSON format:
 {
@@ -419,7 +444,7 @@ Intent definitions:
 {$config['intentDefinitions']}
 - other: Anything else
 
-Only include entities that are explicitly mentioned. Use null for unmentioned entities.
+Include ALL entities that can be extracted from the message. Use null ONLY for truly unmentioned entities.
 PROMPT;
     }
 
@@ -634,6 +659,20 @@ PROMPT;
             }
         }
 
+        // Booking confirmation details
+        if (isset($data['booking_details']) && is_array($data['booking_details'])) {
+            $context .= "BOOKING DETAILS:\n";
+            foreach ($data['booking_details'] as $key => $value) {
+                $context .= "- " . ucfirst($key) . ": {$value}\n";
+            }
+            $context .= "\n";
+        }
+
+        // Error message for booking errors
+        if (isset($data['error_message'])) {
+            $context .= "ERROR MESSAGE: {$data['error_message']}\n\n";
+        }
+
         if (isset($data['action_needed'])) {
             $context .= "\nACTION NEEDED: {$data['action_needed']}\n";
         }
@@ -656,6 +695,8 @@ PROMPT;
                 'booking_inquiry' => "The customer is asking about their booking. Show them their booking details in a friendly way.",
                 'booking_modify' => "The customer wants to modify their booking. If they provided new details (date/time/pax), confirm the changes. If they just said 'reschedule' without new details, show their current booking and ask what they'd like to change.",
                 'booking_cancel' => "The customer wants to cancel. Show their booking and ask for confirmation before canceling.",
+                'booking_confirmation' => "TRANSLATE the booking confirmation to the SAME LANGUAGE as the customer's message while keeping the structure and emojis. Use the provided confirmation_template as reference but translate the text content.",
+                'booking_error' => "Inform the customer about the booking error in the SAME LANGUAGE as their message. Be apologetic and helpful, offer to show the booking form again.",
                 'general_question' => "Answer the customer's question using available information.",
                 default => "Help the customer with their request.",
             };

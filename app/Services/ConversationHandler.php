@@ -93,6 +93,12 @@ class ConversationHandler
             // Store the incoming message FIRST (before any responses)
             $message = $this->storeMessage($conversation, $messageData);
 
+            // If message is null, it's a duplicate - skip processing
+            if (!$message) {
+                Log::debug('Skipping duplicate message processing');
+                return;
+            }
+
             // Update last message timestamp
             $conversation->update(['last_message_at' => now()]);
 
@@ -230,9 +236,20 @@ class ConversationHandler
 
     /**
      * Store a message in the database.
+     * Uses firstOrCreate to prevent duplicate messages from webhook retries.
      */
-    protected function storeMessage(Conversation $conversation, array $messageData): Message
+    protected function storeMessage(Conversation $conversation, array $messageData): ?Message
     {
+        // Check if message already exists (prevent duplicates from webhook retries)
+        $existingMessage = Message::where('whatsapp_message_id', $messageData['message_id'])->first();
+        if ($existingMessage) {
+            Log::info('Duplicate message ignored', [
+                'whatsapp_message_id' => $messageData['message_id'],
+                'existing_message_id' => $existingMessage->id,
+            ]);
+            return null; // Return null to signal this is a duplicate
+        }
+
         $mediaUrl = null;
 
         // For image messages, download from WhatsApp and upload to Cloudinary

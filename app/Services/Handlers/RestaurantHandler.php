@@ -62,16 +62,11 @@ class RestaurantHandler implements BusinessHandlerInterface
 
     /**
      * Process an incoming message for restaurant business type.
+     * Uses AI-first approach for multilingual intent detection.
      */
     public function processMessage(Conversation $conversation, Message $message, string $content, User $merchant): void
     {
-        // Check if this looks like a filled booking form
-        if ($this->booking->isBookingAttempt($content)) {
-            $this->handleBookingAttempt($conversation, $content, $merchant);
-            return;
-        }
-
-        // Detect intent with full conversation context
+        // AI-FIRST: Always detect intent first (handles all languages automatically)
         $intentResult = $this->rag->detectIntent($content, $conversation, 'restaurant');
         $intent = $intentResult['intent'];
         $entities = $intentResult['entities'];
@@ -86,13 +81,22 @@ class RestaurantHandler implements BusinessHandlerInterface
         switch ($intent) {
             case 'greeting':
                 // For greetings, let AI generate a friendly response without the booking form
-                // The initial greeting with options is already sent by ConversationHandler for new conversations
                 $this->handleSimpleGreeting($conversation, $merchant);
                 break;
 
             case 'booking_request':
-                // Show booking form for booking requests
-                $this->handleGreeting($conversation, $merchant);
+                // Check if we have complete booking details in entities
+                $hasDate = !empty($entities['date']);
+                $hasTime = !empty($entities['time']);
+                $hasPax = !empty($entities['pax']);
+
+                if ($hasDate && $hasTime && $hasPax) {
+                    // Complete booking details provided - process as booking attempt
+                    $this->handleBookingAttempt($conversation, $content, $merchant);
+                } else {
+                    // Incomplete - show booking form
+                    $this->handleGreeting($conversation, $merchant);
+                }
                 break;
 
             case 'booking_inquiry':
@@ -111,7 +115,6 @@ class RestaurantHandler implements BusinessHandlerInterface
             case 'general_question':
             default:
                 // Let ConversationHandler handle general questions
-                // AI intent detection is trusted - if customer wanted to book, it would detect 'booking_request'
                 return;
         }
     }
@@ -250,12 +253,20 @@ class RestaurantHandler implements BusinessHandlerInterface
         );
 
         if (!$parsedBooking || !($parsedBooking['is_valid'] ?? false)) {
+            // Use AI to respond in customer's language
+            $lastMessage = $conversation->messages()->reorder()->latest('created_at')->first();
             $reason = $parsedBooking['reason'] ?? 'Could not parse booking details.';
-            $response = "Sorry, I couldn't process your reservation. " . $reason . "\n\n" .
-                "Please make sure to include:\n" .
-                "• Number of guests (pax)\n" .
-                "• Date and time\n\n" .
-                "Would you like me to show the booking form again?";
+
+            $response = $this->rag->generateContextualResponse(
+                'booking_error',
+                $lastMessage?->content ?? 'booking request',
+                [
+                    'error_message' => $reason,
+                    'action_needed' => 'Inform customer we could not process reservation. Ask them to provide: number of guests and date/time. Ask if they want the booking form.',
+                ],
+                $conversation,
+                'restaurant'
+            );
 
             $this->sendResponse($conversation, $response);
             return;
@@ -271,9 +282,30 @@ class RestaurantHandler implements BusinessHandlerInterface
                 return;
             }
 
-            // Send confirmation
-            $confirmation = $this->booking->formatConfirmationMessage($booking);
-            $this->sendResponse($conversation, $confirmation);
+            // Get the template confirmation message
+            $templateConfirmation = $this->booking->formatConfirmationMessage($booking);
+
+            // Use AI to translate the confirmation to customer's language
+            $lastMessage = $conversation->messages()->reorder()->latest('created_at')->first();
+            $translatedConfirmation = $this->rag->generateContextualResponse(
+                'booking_confirmation',
+                $lastMessage?->content ?? 'booking request',
+                [
+                    'confirmation_template' => $templateConfirmation,
+                    'booking_details' => [
+                        'date' => $booking->booking_date->format('l, F j, Y'),
+                        'time' => \Carbon\Carbon::parse($booking->booking_time)->format('g:i A'),
+                        'pax' => $booking->pax,
+                        'table' => $booking->table->name ?? 'TBA',
+                        'name' => $booking->customer_name,
+                    ],
+                    'action_needed' => 'Send booking confirmation in the SAME LANGUAGE as the customer\'s message. Keep the same structure and emojis as the template.',
+                ],
+                $conversation,
+                'restaurant'
+            );
+
+            $this->sendResponse($conversation, $translatedConfirmation);
 
             // Clear the booking context
             $conversation->clearContext();
@@ -316,7 +348,19 @@ class RestaurantHandler implements BusinessHandlerInterface
                 $availability = $this->booking->checkAvailability($date, $time, (int) $pax);
 
                 if (!$availability['available']) {
-                    $this->sendResponse($conversation, $availability['message']);
+                    // Use AI to deliver the error message in customer's language
+                    $lastMessage = $conversation->messages()->reorder()->latest('created_at')->first();
+                    $response = $this->rag->generateContextualResponse(
+                        'booking_error',
+                        $lastMessage?->content ?? 'booking request',
+                        [
+                            'error_message' => $availability['message'],
+                            'action_needed' => 'Inform customer about the availability issue and suggest alternatives',
+                        ],
+                        $conversation,
+                        'restaurant'
+                    );
+                    $this->sendResponse($conversation, $response);
                     return;
                 }
 

@@ -297,141 +297,6 @@ const getStatusColor = (status) => {
 
                 <!-- Two Column Layout -->
                 <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <!-- Recent Orders -->
-                    <div class="glass rounded-2xl overflow-hidden">
-                        <div
-                            class="px-6 py-4 border-b border-white/20 bg-gradient-to-r from-cyan-500/10 to-primary-500/10"
-                        >
-                            <h3
-                                class="text-lg font-semibold text-gray-900 flex items-center gap-2"
-                            >
-                                <svg
-                                    class="w-5 h-5 text-cyan-500"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                                    />
-                                </svg>
-                                Recent Orders
-                            </h3>
-                        </div>
-                        <ul class="divide-y divide-gray-100/50">
-                            <li
-                                v-for="order in recentOrdersData"
-                                :key="order.id"
-                            >
-                                <Link
-                                    :href="route('orders.show', order.id)"
-                                    class="block hover:bg-white/50 transition-colors"
-                                >
-                                    <div class="px-6 py-4">
-                                        <div
-                                            class="flex items-center justify-between"
-                                        >
-                                            <div
-                                                class="flex items-center gap-3"
-                                            >
-                                                <div
-                                                    class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-primary-400 rounded-xl flex items-center justify-center text-white font-semibold shadow-sm"
-                                                >
-                                                    {{
-                                                        order.customer_name
-                                                            ?.charAt(0)
-                                                            ?.toUpperCase() ||
-                                                        "?"
-                                                    }}
-                                                </div>
-                                                <div>
-                                                    <p
-                                                        class="text-sm font-medium text-gray-900"
-                                                    >
-                                                        {{
-                                                            order.customer_name
-                                                        }}
-                                                    </p>
-                                                    <p
-                                                        class="text-xs text-gray-500"
-                                                    >
-                                                        {{
-                                                            order.items_count
-                                                        }}
-                                                        items •
-                                                        {{ order.total_amount }}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <span
-                                                :class="[
-                                                    'px-2 py-1 text-xs font-medium rounded-full',
-                                                    getStatusColor(
-                                                        order.status
-                                                    ),
-                                                ]"
-                                            >
-                                                {{ order.status_label }}
-                                            </span>
-                                        </div>
-                                        <div
-                                            class="mt-2 flex items-center gap-4 text-sm text-gray-500"
-                                        >
-                                            <span>{{
-                                                order.fulfillment_type ===
-                                                "pickup"
-                                                    ? "🏪 Pickup"
-                                                    : "🚚 Delivery"
-                                            }}</span>
-                                            <span
-                                                >📅
-                                                {{
-                                                    order.requested_datetime
-                                                }}</span
-                                            >
-                                        </div>
-                                    </div>
-                                </Link>
-                            </li>
-                            <li
-                                v-if="!recentOrdersData?.length"
-                                class="px-6 py-8 text-center text-gray-500"
-                            >
-                                <div
-                                    class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3"
-                                >
-                                    <svg
-                                        class="w-8 h-8 text-gray-400"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            stroke-width="2"
-                                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                                        />
-                                    </svg>
-                                </div>
-                                No orders yet
-                            </li>
-                        </ul>
-                        <div
-                            class="px-6 py-3 bg-gradient-to-r from-gray-50 to-gray-100/50 border-t border-gray-100"
-                        >
-                            <Link
-                                :href="route('orders.index')"
-                                class="text-sm font-medium text-cyan-600 hover:text-cyan-700 flex items-center gap-1"
-                            >
-                                View all orders →
-                            </Link>
-                        </div>
-                    </div>
-
                     <!-- Recent Conversations -->
                     <div class="glass rounded-2xl overflow-hidden">
                         <div
@@ -541,6 +406,139 @@ const getStatusColor = (status) => {
                                 class="text-sm font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1"
                             >
                                 View all conversations →
+                            </Link>
+                        </div>
+                    </div>
+
+                    <!-- Recent Orders -->
+                    <div class="glass rounded-2xl overflow-hidden">
+                        <div
+                            class="px-6 py-4 border-b border-white/20 bg-gradient-to-r from-cyan-500/10 to-primary-500/10"
+                        >
+                            <h3
+                                class="text-lg font-semibold text-gray-900 flex items-center gap-2"
+                            >
+                                <svg
+                                    class="w-5 h-5 text-cyan-500"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                    />
+                                </svg>
+                                Recent Orders
+                            </h3>
+                        </div>
+                        <ul class="divide-y divide-gray-100/50">
+                            <li
+                                v-for="order in recentOrdersData"
+                                :key="order.id"
+                            >
+                                <Link
+                                    :href="route('orders.show', order.id)"
+                                    class="block hover:bg-white/50 transition-colors"
+                                >
+                                    <div class="px-6 py-4">
+                                        <div
+                                            class="flex items-center justify-between"
+                                        >
+                                            <div
+                                                class="flex items-center gap-3"
+                                            >
+                                                <div
+                                                    class="w-10 h-10 bg-gradient-to-br from-cyan-400 to-primary-400 rounded-xl flex items-center justify-center text-white font-semibold shadow-sm"
+                                                >
+                                                    {{
+                                                        order.customer_name
+                                                            ?.charAt(0)
+                                                            ?.toUpperCase() ||
+                                                        "?"
+                                                    }}
+                                                </div>
+                                                <div>
+                                                    <p
+                                                        class="text-sm font-medium text-gray-900"
+                                                    >
+                                                        {{
+                                                            order.customer_name
+                                                        }}
+                                                    </p>
+                                                    <p
+                                                        class="text-xs text-gray-500"
+                                                    >
+                                                        {{ order.items_count }}
+                                                        items •
+                                                        {{ order.total_amount }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span
+                                                :class="[
+                                                    'px-2 py-1 text-xs font-medium rounded-full',
+                                                    getStatusColor(
+                                                        order.status
+                                                    ),
+                                                ]"
+                                            >
+                                                {{ order.status_label }}
+                                            </span>
+                                        </div>
+                                        <div
+                                            class="mt-2 flex items-center gap-4 text-sm text-gray-500"
+                                        >
+                                            <span>{{
+                                                order.fulfillment_type ===
+                                                "pickup"
+                                                    ? "🏪 Pickup"
+                                                    : "🚚 Delivery"
+                                            }}</span>
+                                            <span
+                                                >📅
+                                                {{
+                                                    order.requested_datetime
+                                                }}</span
+                                            >
+                                        </div>
+                                    </div>
+                                </Link>
+                            </li>
+                            <li
+                                v-if="!recentOrdersData?.length"
+                                class="px-6 py-8 text-center text-gray-500"
+                            >
+                                <div
+                                    class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                                >
+                                    <svg
+                                        class="w-8 h-8 text-gray-400"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            stroke-width="2"
+                                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                        />
+                                    </svg>
+                                </div>
+                                No orders yet
+                            </li>
+                        </ul>
+                        <div
+                            class="px-6 py-3 bg-gradient-to-r from-gray-50 to-gray-100/50 border-t border-gray-100"
+                        >
+                            <Link
+                                :href="route('orders.index')"
+                                class="text-sm font-medium text-cyan-600 hover:text-cyan-700 flex items-center gap-1"
+                            >
+                                View all orders →
                             </Link>
                         </div>
                     </div>
