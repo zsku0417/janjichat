@@ -51,11 +51,11 @@ class AdminMerchantController extends Controller
             }
         }
 
-        // Sorting
-        $sortKey = $request->input('sort_key', 'created_at');
+        // Sorting - default to updated_at desc (most recently updated first)
+        $sortKey = $request->input('sort_key', 'updated_at');
         $sortOrder = $request->input('sort_order', 'desc');
 
-        $allowedSortKeys = ['name', 'email', 'business_type', 'created_at', 'is_active'];
+        $allowedSortKeys = ['name', 'email', 'business_type', 'created_at', 'updated_at', 'is_active'];
         if (in_array($sortKey, $allowedSortKeys)) {
             $query->orderBy($sortKey, $sortOrder === 'asc' ? 'asc' : 'desc');
         }

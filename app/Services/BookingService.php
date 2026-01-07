@@ -699,21 +699,16 @@ PROMPT;
 
     /**
      * Get upcoming bookings needing reminders.
+     * Finds confirmed bookings that are scheduled for tomorrow.
      *
      * @return Collection
      */
     public function getUpcomingReminders(): Collection
     {
-        // Get reminder_hours_before from MerchantSetting
-        $merchant = User::where('role', User::ROLE_MERCHANT)->first();
-        $merchantSettings = $merchant ? MerchantSetting::where('user_id', $merchant->id)->first() : null;
-        $reminderHours = $merchantSettings?->reminder_hours_before ?? 24;
-        $reminderTime = now()->addHours($reminderHours);
+        $tomorrow = now()->addDay()->toDateString();
 
-        return Booking::needsReminder()
-            ->whereDate('booking_date', $reminderTime->toDateString())
-            ->whereTime('booking_time', '<=', $reminderTime->format('H:i:s'))
-            ->whereTime('booking_time', '>', now()->format('H:i:s'))
+        return Booking::needsReminder()  // status='confirmed' AND reminder_sent=false
+            ->whereDate('booking_date', $tomorrow)
             ->with(['table', 'conversation'])
             ->get();
     }
