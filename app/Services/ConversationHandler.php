@@ -87,17 +87,17 @@ class ConversationHandler
             $conversation = $result['conversation'];
             $isNew = $result['isNew'];
 
+            // Set the correct merchant for WhatsApp service (multi-tenant support)
+            // This ensures messages are sent using the conversation's merchant credentials
+            if ($conversation->user) {
+                $this->whatsApp->setMerchant($conversation->user);
+            }
+
             // Check if conversation has no prior messages (fresh start or cleared)
             $isFirstMessage = $isNew || $conversation->messages()->count() === 0;
 
             // Store the incoming message FIRST (before any responses)
             $message = $this->storeMessage($conversation, $messageData);
-
-            // If message is null, it's a duplicate - skip processing
-            if (!$message) {
-                Log::debug('Skipping duplicate message processing');
-                return;
-            }
 
             // Update last message timestamp
             $conversation->update(['last_message_at' => now()]);
@@ -243,11 +243,11 @@ class ConversationHandler
         // Check if message already exists (prevent duplicates from webhook retries)
         $existingMessage = Message::where('whatsapp_message_id', $messageData['message_id'])->first();
         if ($existingMessage) {
-            Log::info('Duplicate message ignored', [
+            Log::info('Duplicate message detected, proceeding to AI processing', [
                 'whatsapp_message_id' => $messageData['message_id'],
                 'existing_message_id' => $existingMessage->id,
             ]);
-            return null; // Return null to signal this is a duplicate
+            return $existingMessage; // Return existing message to allow AI processing
         }
 
         $mediaUrl = null;

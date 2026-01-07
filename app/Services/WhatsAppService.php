@@ -63,6 +63,27 @@ class WhatsAppService
     }
 
     /**
+     * Set a specific merchant's credentials for sending messages.
+     * Use this for multi-tenant support when you know which merchant to use.
+     */
+    public function setMerchant(User $merchant): self
+    {
+        if ($merchant->hasWhatsAppConfigured()) {
+            $this->activeMerchant = $merchant;
+            $this->phoneNumberId = $merchant->whatsapp_phone_number_id;
+            $this->accessToken = $merchant->whatsapp_access_token;
+
+            Log::debug('WhatsApp credentials set for merchant', [
+                'merchant_id' => $merchant->id,
+                'merchant_name' => $merchant->name,
+                'phone_number_id' => $this->phoneNumberId,
+            ]);
+        }
+
+        return $this;
+    }
+
+    /**
      * Check if WhatsApp is properly configured.
      */
     public function isConfigured(): bool
