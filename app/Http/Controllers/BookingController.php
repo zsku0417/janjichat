@@ -26,7 +26,13 @@ class BookingController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = auth()->user();
         $query = Booking::with('table');
+
+        // Multi-tenant: Merchants see only their bookings
+        if ($user->isMerchant()) {
+            $query->where('user_id', $user->id);
+        }
 
         // Search functionality (case-insensitive)
         if ($request->has('search') && $request->search) {
@@ -136,6 +142,7 @@ class BookingController extends Controller
 
         try {
             $this->bookingService->createBooking([
+                'user_id' => auth()->id(), // Use authenticated user's ID
                 'customer_name' => $request->customer_name,
                 'customer_phone' => $request->customer_phone,
                 'booking_date' => $request->booking_date,

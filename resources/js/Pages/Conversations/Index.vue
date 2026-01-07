@@ -1,5 +1,6 @@
 <script setup>
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
+import DeleteModal from "@/Components/DeleteModal.vue";
 import { Head, useForm, router, usePage } from "@inertiajs/vue3";
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 
@@ -426,6 +427,32 @@ const toggleMode = () => {
             },
         }
     );
+};
+
+// Delete chat modal
+const showDeleteModal = ref(false);
+const isDeleting = ref(false);
+
+const deleteChat = () => {
+    showDeleteModal.value = true;
+};
+
+const confirmDeleteChat = () => {
+    if (!conversationData.value) return;
+
+    isDeleting.value = true;
+    router.delete(route("conversations.destroy", conversationData.value.id), {
+        onSuccess: () => {
+            showDeleteModal.value = false;
+            conversationData.value = null;
+            selectedConversationId.value = null;
+            messagesData.value = [];
+            refreshConversationsList();
+        },
+        onFinish: () => {
+            isDeleting.value = false;
+        },
+    });
 };
 
 const refreshConversationsList = () => {
@@ -1126,6 +1153,26 @@ const closeMobileChat = () => {
                                                 : "AI"
                                         }}
                                     </button>
+                                    <!-- Delete Chat Button -->
+                                    <button
+                                        @click="deleteChat"
+                                        class="p-2 rounded-xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                                        title="Delete this conversation"
+                                    >
+                                        <svg
+                                            class="w-5 h-5"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                stroke-width="2"
+                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                            />
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
 
@@ -1418,4 +1465,17 @@ const closeMobileChat = () => {
             </div>
         </div>
     </AuthenticatedLayout>
+
+    <!-- Delete Chat Modal -->
+    <DeleteModal
+        :show="showDeleteModal"
+        title="Delete Conversation"
+        :message="`Are you sure you want to delete this conversation with ${
+            conversationData?.customer_name || 'this customer'
+        }? All messages will be permanently deleted.`"
+        confirmText="Delete Conversation"
+        :processing="isDeleting"
+        @close="showDeleteModal = false"
+        @confirm="confirmDeleteChat"
+    />
 </template>

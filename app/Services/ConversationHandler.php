@@ -138,7 +138,7 @@ class ConversationHandler
     /**
      * Get existing conversation or create a new one.
      * Returns array with conversation and isNew flag.
-     * Now includes multi-tenant detection via phone_number_id.
+     * Multi-tenant: Conversations are unique per customer+merchant pair.
      */
     protected function getOrCreateConversation(array $messageData): array
     {
@@ -153,14 +153,20 @@ class ConversationHandler
             $merchant = User::where('role', User::ROLE_MERCHANT)->first();
         }
 
-        // FIRST: Check if any conversation with this whatsapp_id exists (regardless of merchant)
-        // This prevents duplicate key violations
-        $conversation = Conversation::where('whatsapp_id', $messageData['from'])->first();
+        // Multi-tenant: Find conversation by BOTH whatsapp_id AND merchant user_id
+        // This allows the same customer to have separate conversations with different merchants
+        $conversationQuery = Conversation::where('whatsapp_id', $messageData['from']);
+
+        if ($merchant) {
+            $conversationQuery->where('user_id', $merchant->id);
+        }
+
+        $conversation = $conversationQuery->first();
 
         $isNew = false;
 
         if (!$conversation) {
-            // No conversation exists, create a new one
+            // No conversation exists for this customer+merchant, create a new one
             $conversation = Conversation::create([
                 'user_id' => $merchant?->id,
                 'whatsapp_id' => $messageData['from'],
@@ -179,19 +185,15 @@ class ConversationHandler
                 'merchant_id' => $merchant?->id,
             ]);
         } else {
-            // Conversation exists - update merchant association if needed
-            if (!$conversation->user_id && $merchant) {
-                $conversation->update(['user_id' => $merchant->id]);
-                Log::info('Updated conversation with merchant user_id', [
-                    'conversation_id' => $conversation->id,
-                    'merchant_id' => $merchant->id,
-                ]);
-            }
-
             // Update customer name if we have it now but didn't before
             if ($messageData['contact_name'] && !$conversation->customer_name) {
                 $conversation->update(['customer_name' => $messageData['contact_name']]);
             }
+
+            Log::info('Existing conversation found', [
+                'conversation_id' => $conversation->id,
+                'merchant_id' => $conversation->user_id,
+            ]);
         }
 
         return ['conversation' => $conversation, 'isNew' => $isNew];

@@ -33,6 +33,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'messages'])->name('conversations.messages');
     Route::post('/conversations/{conversation}/reply', [ConversationController::class, 'reply'])->name('conversations.reply');
     Route::post('/conversations/{conversation}/toggle-mode', [ConversationController::class, 'toggleMode'])->name('conversations.toggle-mode');
+    Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy'])->name('conversations.destroy');
 
     // Documents / Knowledge Base (shared by all business types)
     Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');

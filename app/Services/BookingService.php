@@ -333,6 +333,7 @@ PROMPT;
         }
 
         $data = [
+            'user_id' => $conversation->user_id, // Use merchant from conversation
             'conversation_id' => $conversation->id,
             'customer_name' => $bookingData['name'] ?? $conversation->customer_name ?? 'Customer',
             'customer_phone' => $bookingData['phone'] ?? $conversation->phone_number ?? $conversation->whatsapp_id,

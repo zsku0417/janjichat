@@ -189,4 +189,23 @@ class ConversationController extends Controller
 
         return back()->with('success', 'Conversation mode updated!');
     }
+
+    /**
+     * Delete a conversation and all its messages.
+     */
+    public function destroy(Conversation $conversation): RedirectResponse
+    {
+        // Delete all related messages first
+        $conversation->messages()->delete();
+
+        // Clear any context data
+        $conversation->clearContext();
+
+        // Delete the conversation
+        $conversation->delete();
+
+        return redirect()->route('conversations.index')
+            ->with('success', 'Conversation deleted successfully!');
+    }
 }
+
