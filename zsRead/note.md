@@ -41,3 +41,10 @@ Admin
 User
 -To receive follow ups in the form of reminders, thank you notes or follow ups basing on the 
 activity.
+
+
+
+
+
+php artisan config:clear; php artisan cache:clear; php artisan route:clear; php artisan view:clear
+https://japingly-isodiametric-omega.ngrok-free.dev/api/webhook/whatsapp

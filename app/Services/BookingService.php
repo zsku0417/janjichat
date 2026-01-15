@@ -720,10 +720,9 @@ PROMPT;
      * @param Booking $booking
      * @return string
      */
-    public function formatConfirmationMessage(Booking $booking): string
+    public function formatConfirmationMessage(Booking $booking, User $merchant): string
     {
         // Get merchant settings (conversation is linked to merchant)
-        $merchant = User::where('role', User::ROLE_MERCHANT)->first();
         $merchantSettings = $merchant?->merchantSettings;
 
         // Use custom template or default

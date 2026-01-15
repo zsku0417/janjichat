@@ -343,7 +343,7 @@ const getFeatureColorClasses = (color) => {
                                 :href="route('login')"
                                 class="group relative px-8 py-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-lg shadow-lg shadow-slate-900/10 dark:shadow-white/10 hover:shadow-xl hover:shadow-slate-900/20 dark:hover:shadow-white/20 transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 flex items-center justify-center gap-3"
                             >
-                                <span>Get Started Free</span>
+                                <span>Get Started</span>
                                 <svg
                                     class="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300"
                                     fill="none"
@@ -880,7 +880,7 @@ const getFeatureColorClasses = (color) => {
                     :href="route('login')"
                     class="group inline-flex items-center gap-3 px-10 py-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-lg shadow-lg shadow-slate-900/10 dark:shadow-white/10 hover:shadow-xl hover:shadow-slate-900/20 dark:hover:shadow-white/20 transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300"
                 >
-                    <span>Start Now — It's Free</span>
+                    <span>Start Now</span>
                     <svg
                         class="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300"
                         fill="none"

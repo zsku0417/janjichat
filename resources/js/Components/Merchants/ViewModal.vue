@@ -231,7 +231,7 @@ const formatDate = (date) => {
                             <div
                                 v-for="doc in merchant.documents"
                                 :key="doc.id"
-                                class="p-4 bg-gray-50 dark:bg-slate-700 rounded-xl"
+                                class="p-4 bg-gray-50 dark:bg-slate-700 rounded-xl mb-2"
                             >
                                 <div class="flex items-start justify-between">
                                     <div class="flex-1">

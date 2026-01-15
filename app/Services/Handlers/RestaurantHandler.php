@@ -283,7 +283,7 @@ class RestaurantHandler implements BusinessHandlerInterface
             }
 
             // Get the template confirmation message
-            $templateConfirmation = $this->booking->formatConfirmationMessage($booking);
+            $templateConfirmation = $this->booking->formatConfirmationMessage($booking, $merchant);
 
             // Use AI to translate the confirmation to customer's language
             $lastMessage = $conversation->messages()->reorder()->latest('created_at')->first();
@@ -341,6 +341,8 @@ class RestaurantHandler implements BusinessHandlerInterface
         $pax = $entities['pax'] ?? null;
         $specialRequest = $entities['special_request'] ?? null;
 
+        $merchant = User::find(2);
+
         // If we have all required information
         if ($name && $date && $time && $pax) {
             try {
@@ -381,7 +383,7 @@ class RestaurantHandler implements BusinessHandlerInterface
                     $conversation->update(['customer_name' => $name]);
                 }
 
-                $confirmation = $this->booking->formatConfirmationMessage($booking);
+                $confirmation = $this->booking->formatConfirmationMessage($booking, $merchant);
                 $this->sendResponse($conversation, $confirmation);
 
             } catch (Exception $e) {
