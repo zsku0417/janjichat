@@ -33,11 +33,13 @@ class Order extends Model
         'notes',
         'status',
         'total_amount',
+        'reminder_sent',
     ];
 
     protected $casts = [
         'requested_datetime' => 'datetime',
         'total_amount' => 'decimal:2',
+        'reminder_sent' => 'boolean',
     ];
 
     /**

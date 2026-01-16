@@ -603,7 +603,7 @@ PROMPT;
             $replacements = [
                 '{name}' => $order->customer_name,
                 '{order_code}' => $order->code,
-                '{total}' => 'RM' . $order->formatted_total,
+                '{total}' => $order->formatted_total,
                 '{items}' => $itemsList,
                 '{datetime}' => $order->requested_datetime?->format('d M Y, g:i A') ?? 'TBD',
                 '{fulfillment}' => $fulfillment,

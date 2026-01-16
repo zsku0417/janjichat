@@ -48,3 +48,8 @@ activity.
 
 php artisan config:clear; php artisan cache:clear; php artisan route:clear; php artisan view:clear
 https://japingly-isodiametric-omega.ngrok-free.dev/api/webhook/whatsapp
+
+
+
+php artisan orders:send-reminders
+php artisan queue:work --once
